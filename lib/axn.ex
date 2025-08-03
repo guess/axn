@@ -131,7 +131,13 @@ defmodule Axn do
       end
 
       defp apply_step({step_name, opts}, %Axn.Context{} = ctx) when is_atom(step_name) do
-        apply_step_function(__MODULE__, step_name, ctx, opts, :step_not_found)
+        case step_name do
+          :cast_validate_params ->
+            Axn.Steps.CastValidateParams.cast_validate_params(ctx, opts)
+
+          _ ->
+            apply_step_function(__MODULE__, step_name, ctx, opts, :step_not_found)
+        end
       end
 
       defp apply_step({{module, function}, opts}, %Axn.Context{} = ctx) do
@@ -140,11 +146,13 @@ defmodule Axn do
 
       defp apply_step_function(module, function, ctx, opts, error_type) do
         cond do
-          function_exported?(module, function, 2) -> 
+          function_exported?(module, function, 2) ->
             apply(module, function, [ctx, opts])
-          function_exported?(module, function, 1) -> 
+
+          function_exported?(module, function, 1) ->
             apply(module, function, [ctx])
-          true -> 
+
+          true ->
             {:halt, {:error, error_type}}
         end
       end
