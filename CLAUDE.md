@@ -92,24 +92,26 @@ defstruct [
 ### Context Helper Functions
 ```elixir
 # Assign values (like Phoenix.Component.assign/3)
-Axn.Context.assign(ctx, :current_user, user)
-Axn.Context.assign(ctx, %{current_user: user, theme: "dark"})
-Axn.Context.assign(ctx, current_user: user, theme: "dark")  # Phoenix LiveView style
+Context.assign(ctx, :current_user, user)
+Context.assign(ctx, %{current_user: user, theme: "dark"})
+Context.assign(ctx, current_user: user, theme: "dark")  # Phoenix LiveView style
 
 # Get private values
-Axn.Context.get_private(ctx, :correlation_id)           # Returns value or nil
-Axn.Context.get_private(ctx, :correlation_id, "default") # Returns value or default
+Context.get_private(ctx, :correlation_id)           # Returns value or nil
+Context.get_private(ctx, :correlation_id, "default") # Returns value or default
 
 # Put private values (like Plug.Conn.put_private/3)
-Axn.Context.put_private(ctx, :correlation_id, id)
-Axn.Context.put_private(ctx, :changeset, changeset)
+Context.put_private(ctx, :correlation_id, id)
+Context.put_private(ctx, :changeset, changeset)
 
 # Update params
-Axn.Context.put_params(ctx, validated_params)
+Context.put_params(ctx, validated_params)
 
 # Update result
-Axn.Context.put_result(ctx, {:ok, user})
+Context.put_result(ctx, {:ok, user})
 ```
+
+**Note**: `Context` is automatically aliased when using `use Axn`, so you don't need to write `Axn.Context`.
 
 ### Context Evolution
 - Steps may modify context using helper functions or direct struct updates
@@ -422,7 +424,7 @@ defmodule MyApp.UserActions do
     step :authorize, &can_create_users?/1
     step :handle_create
 
-    def handle_create(%Axn.Context{} = ctx) do
+    def handle_create(ctx) do
       case Users.create(ctx.params) do
         {:ok, user} -> {:halt, {:ok, user}}
         {:error, changeset} -> {:halt, {:error, %{reason: :creation_failed, changeset: changeset}}}
@@ -460,11 +462,11 @@ end
 - [x] Implement minimal `Axn` macro module with `__using__/1` to make tests pass
 
 ### Phase 2: Core DSL with TDD
-- [ ] Write failing tests for `action/2` macro functionality
-- [ ] Implement `action/2` macro that collects steps
-- [ ] Write failing tests for `step/1` and `step/2` macros
-- [ ] Implement `step/1` and `step/2` macros
-- [ ] Write failing tests for basic step pipeline execution
+- [x] Write failing tests for `action/2` macro functionality
+- [x] Implement `action/2` macro that collects steps
+- [x] Write failing tests for `step/1` and `step/2` macros
+- [x] Implement `step/1` and `step/2` macros
+- [x] Write failing tests for basic step pipeline execution
 - [ ] Implement `@before_compile` hook and basic step pipeline with `Enum.reduce_while/3`
 
 ### Phase 3: Built-in Steps with TDD
@@ -550,7 +552,7 @@ action :ping do
   step :handle_ping
 
   def handle_ping(ctx) do
-    {:cont, Axn.Context.put_result(ctx, "pong")}
+    {:cont, Context.put_result(ctx, "pong")}
   end
 end
 ```
@@ -563,12 +565,12 @@ action :create_user do
   step :validate_business_rules
   step :handle_create_user
 
-  def validate_business_rules(%Axn.Context{} = ctx) do
+  def validate_business_rules(ctx) do
     # Custom validation logic
     {:cont, ctx}
   end
 
-  def handle_create_user(%Axn.Context{} = ctx) do
+  def handle_create_user(ctx) do
     # Business logic
     {:halt, {:ok, %{message: "User created"}}}
   end
@@ -596,7 +598,7 @@ action :request_otp do
     |> validate_challenge_token_not_expired(:challenge_token)
   end
 
-  def handle_request(%Axn.Context{} = ctx) do
+  def handle_request(ctx) do
     case Accounts.generate_otp(ctx.params.phone) do
       {:ok, otp} ->
         SmsService.send_otp(ctx.params.phone, otp.code)
