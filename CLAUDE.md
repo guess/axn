@@ -174,20 +174,45 @@ step :cast_validate_params, schema: schema, validate: validation_function
 
 **Failure**: `{:halt, {:error, %{reason: :invalid_params, changeset: changeset}}}`
 
-#### :authorize
-```elixir
-step :authorize, authorization_config
+#### Authorization Patterns (No Built-in Step)
+Authorization is too application-specific for a built-in step. Instead, use simple custom steps following these patterns:
 
-# authorization_config =
-#   :allow_all |
-#   function/1   # (ctx) -> boolean | {:error, reason}
+```elixir
+# Pattern 1: Simple role check
+step :require_admin
+
+def require_admin(ctx) do
+  if admin?(ctx.assigns.current_user) do
+    {:cont, ctx}
+  else
+    {:halt, {:error, :unauthorized}}
+  end
+end
+
+# Pattern 2: Resource-based authorization  
+step :authorize_user_access
+
+def authorize_user_access(ctx) do
+  if can_access?(ctx.assigns.current_user, ctx.params.user_id) do
+    {:cont, ctx}
+  else
+    {:halt, {:error, :unauthorized}}
+  end
+end
+
+# Pattern 3: Action-based authorization
+step :authorize_action
+
+def authorize_action(ctx) do
+  if allowed?(ctx.assigns.current_user, ctx.action) do
+    {:cont, ctx}
+  else
+    {:halt, {:error, :unauthorized}}
+  end
+end
 ```
 
-**Behavior**: Check if the current user is authorized to perform this action.
-
-**Success**: `{:cont, ctx}`
-
-**Failure**: `{:halt, {:error, :unauthorized}}`
+**Standard Error Response**: Always use `{:halt, {:error, :unauthorized}}` for authorization failures.
 
 ## Telemetry Integration
 
@@ -421,8 +446,16 @@ defmodule MyApp.UserActions do
 
   action :create_user do
     step :cast_validate_params, schema: %{email!: :string, name!: :string}
-    step :authorize, &can_create_users?/1
+    step :require_admin
     step :handle_create
+
+    def require_admin(ctx) do
+      if admin?(ctx.assigns.current_user) do
+        {:cont, ctx}
+      else
+        {:halt, {:error, :unauthorized}}
+      end
+    end
 
     def handle_create(ctx) do
       case Users.create(ctx.params) do
@@ -431,7 +464,7 @@ defmodule MyApp.UserActions do
       end
     end
 
-    defp can_create_users?(_ctx), do: true
+    defp admin?(user), do: user && user.role == "admin"
   end
 end
 
@@ -475,13 +508,12 @@ end
 - [x] Streamline result processing in `run/3` function
 - [x] Maintain all 30 passing tests through optimizations
 
-### Phase 3: Built-in Steps with TDD
-- [ ] Write comprehensive failing tests for `:cast_validate_params` step
-- [ ] Implement `:cast_validate_params` step with schema validation and optional custom validation function
-- [ ] Write failing tests for `:authorize` step with various auth configs
-- [ ] Implement `:authorize` step with simple auth configs
-- [ ] Write failing tests for step resolution (local vs external modules)
-- [ ] Implement step resolution functionality
+### Phase 3: Built-in Steps with TDD ✅ **COMPLETED**
+- [x] Write comprehensive failing tests for `:cast_validate_params` step
+- [x] Implement `:cast_validate_params` step with schema validation and optional custom validation function
+- [x] Write failing tests for step resolution (local vs external modules)
+- [x] Implement step resolution functionality
+- [x] Document authorization patterns instead of built-in `:authorize` step (simplified approach)
 
 ### Phase 4: Error Handling with TDD
 - [ ] Write failing tests for proper error propagation through pipeline
@@ -567,9 +599,17 @@ end
 ```elixir
 action :create_user do
   step :cast_validate_params, schema: %{email!: :string, name!: :string, phone: :string}
-  step :authorize, &can_create_users?/1
+  step :require_admin
   step :validate_business_rules
   step :handle_create_user
+
+  def require_admin(ctx) do
+    if admin?(ctx.assigns.current_user) do
+      {:cont, ctx}
+    else
+      {:halt, {:error, :unauthorized}}
+    end
+  end
 
   def validate_business_rules(ctx) do
     # Custom validation logic
@@ -593,7 +633,7 @@ action :request_otp do
       challenge_token!: :string
     },
     validate: &validate_phone_and_token/1
-  step :authorize, &can_request_otp?/1
+  step :require_authenticated_user
   step :handle_request
 
   defp validate_phone_and_token(changeset) do
@@ -620,7 +660,7 @@ end
 ```elixir
 action :complex_operation do
   step :cast_validate_params, schema: %{data!: :string}
-  step :authorize, &admin_only?/1
+  step :require_admin
   step {MySteps, :enrich_context}, fields: [:preferences, :billing]
   step {MySteps, :validate_external_service}
   step :handle_operation
