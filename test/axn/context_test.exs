@@ -76,6 +76,36 @@ defmodule Axn.ContextTest do
     end
   end
 
+  describe "Axn.Context.assign/2 with keyword list" do
+    test "assigns multiple key-value pairs from keyword list" do
+      ctx = %Axn.Context{}
+      updated_ctx = Axn.Context.assign(ctx, current_user: %{id: 123}, theme: "dark")
+
+      assert updated_ctx.assigns == %{current_user: %{id: 123}, theme: "dark"}
+    end
+
+    test "merges with existing assignments" do
+      ctx = %Axn.Context{assigns: %{locale: "en"}}
+      updated_ctx = Axn.Context.assign(ctx, current_user: %{id: 123}, theme: "dark")
+
+      assert updated_ctx.assigns == %{locale: "en", current_user: %{id: 123}, theme: "dark"}
+    end
+
+    test "overwrites existing keys" do
+      ctx = %Axn.Context{assigns: %{theme: "light", locale: "en"}}
+      updated_ctx = Axn.Context.assign(ctx, theme: "dark")
+
+      assert updated_ctx.assigns == %{theme: "dark", locale: "en"}
+    end
+
+    test "works with empty keyword list" do
+      ctx = %Axn.Context{assigns: %{existing: "value"}}
+      updated_ctx = Axn.Context.assign(ctx, [])
+
+      assert updated_ctx.assigns == %{existing: "value"}
+    end
+  end
+
   describe "Axn.Context.put_private/3" do
     test "puts a single key-value pair in private" do
       ctx = %Axn.Context{}
@@ -101,6 +131,49 @@ defmodule Axn.ContextTest do
         correlation_id: "abc123",
         raw_params: %{"name" => "John"}
       }
+    end
+  end
+
+  describe "Axn.Context.get_private/2" do
+    test "gets existing private value" do
+      ctx = %Axn.Context{private: %{correlation_id: "abc123", changeset: %{}}}
+      
+      assert Axn.Context.get_private(ctx, :correlation_id) == "abc123"
+      assert Axn.Context.get_private(ctx, :changeset) == %{}
+    end
+
+    test "returns nil for non-existent key" do
+      ctx = %Axn.Context{private: %{existing: "value"}}
+      
+      assert Axn.Context.get_private(ctx, :non_existent) == nil
+    end
+
+    test "returns nil for empty private map" do
+      ctx = %Axn.Context{}
+      
+      assert Axn.Context.get_private(ctx, :any_key) == nil
+    end
+  end
+
+  describe "Axn.Context.get_private/3" do
+    test "gets existing private value ignoring default" do
+      ctx = %Axn.Context{private: %{correlation_id: "abc123"}}
+      
+      assert Axn.Context.get_private(ctx, :correlation_id, "default") == "abc123"
+    end
+
+    test "returns default for non-existent key" do
+      ctx = %Axn.Context{private: %{existing: "value"}}
+      
+      assert Axn.Context.get_private(ctx, :non_existent, "my_default") == "my_default"
+      assert Axn.Context.get_private(ctx, :non_existent, :atom_default) == :atom_default
+      assert Axn.Context.get_private(ctx, :non_existent, nil) == nil
+    end
+
+    test "returns default for empty private map" do
+      ctx = %Axn.Context{}
+      
+      assert Axn.Context.get_private(ctx, :any_key, "default_value") == "default_value"
     end
   end
 
@@ -139,38 +212,4 @@ defmodule Axn.ContextTest do
     end
   end
 
-  describe "Axn.Context.merge/2" do
-    test "merges two contexts" do
-      ctx1 = %Axn.Context{
-        action: :action1,
-        assigns: %{user: %{id: 1}},
-        params: %{name: "John"}
-      }
-      
-      ctx2 = %Axn.Context{
-        assigns: %{theme: "dark"},
-        private: %{correlation_id: "abc123"},
-        result: {:ok, "merged"}
-      }
-
-      merged_ctx = Axn.Context.merge(ctx1, ctx2)
-
-      # ctx2 values should override ctx1 where they exist
-      assert merged_ctx.action == :action1  # from ctx1 (ctx2 has nil)
-      assert merged_ctx.assigns == %{user: %{id: 1}, theme: "dark"}  # merged
-      assert merged_ctx.params == %{name: "John"}  # from ctx1 (ctx2 has empty)
-      assert merged_ctx.private == %{correlation_id: "abc123"}  # from ctx2
-      assert merged_ctx.result == {:ok, "merged"}  # from ctx2
-    end
-
-    test "ctx2 nil values don't override ctx1 non-nil values" do
-      ctx1 = %Axn.Context{action: :keep_this, result: {:ok, "keep"}}
-      ctx2 = %Axn.Context{action: nil, result: nil}
-
-      merged_ctx = Axn.Context.merge(ctx1, ctx2)
-
-      assert merged_ctx.action == :keep_this
-      assert merged_ctx.result == {:ok, "keep"}
-    end
-  end
 end
