@@ -16,7 +16,7 @@ defmodule Axn do
 
       defmodule MyApp.UserActions do
         use Axn, telemetry_prefix: [:my_app, :users]
-        
+
         action :create_user do
           # Action definition
         end
@@ -26,7 +26,10 @@ defmodule Axn do
     telemetry_prefix = Keyword.get(opts, :telemetry_prefix, [])
 
     quote do
-      import Axn, only: [action: 2]
+      import Axn, only: [action: 2, step: 1, step: 2]
+      import Axn.Context
+
+      alias Axn.Context
 
       @telemetry_prefix unquote(telemetry_prefix)
       @actions []
@@ -55,7 +58,7 @@ defmodule Axn do
 
       unquote(block)
 
-      @actions [{unquote(name), @steps} | @actions]
+      @actions [{unquote(name), Enum.reverse(@steps)} | @actions]
       @current_action nil
       @steps []
     end
@@ -72,7 +75,7 @@ defmodule Axn do
   """
   defmacro step(step_spec, opts \\ []) do
     quote do
-      @steps [@steps | [{unquote(step_spec), unquote(opts)}]]
+      @steps [{unquote(step_spec), unquote(opts)} | @steps]
     end
   end
 
@@ -134,7 +137,7 @@ defmodule Axn do
       end
 
       defp apply_step({{module, function}, opts}, %Axn.Context{} = ctx) do
-        # For now, just continue with external steps
+        # External steps with {Module, :function} syntax
         {:cont, ctx}
       end
     end
