@@ -94,6 +94,11 @@ defstruct [
 # Assign values (like Phoenix.Component.assign/3)
 Axn.Context.assign(ctx, :current_user, user)
 Axn.Context.assign(ctx, %{current_user: user, theme: "dark"})
+Axn.Context.assign(ctx, current_user: user, theme: "dark")  # Phoenix LiveView style
+
+# Get private values
+Axn.Context.get_private(ctx, :correlation_id)           # Returns value or nil
+Axn.Context.get_private(ctx, :correlation_id, "default") # Returns value or default
 
 # Put private values (like Plug.Conn.put_private/3)
 Axn.Context.put_private(ctx, :correlation_id, id)
@@ -104,9 +109,6 @@ Axn.Context.put_params(ctx, validated_params)
 
 # Update result
 Axn.Context.put_result(ctx, {:ok, user})
-
-# Merge contexts (useful for testing)
-Axn.Context.merge(ctx1, ctx2)
 ```
 
 ### Context Evolution
@@ -115,7 +117,7 @@ Axn.Context.merge(ctx1, ctx2)
 - Follow Phoenix conventions: user data goes in `assigns`, internal state in `private`
 - Common private fields: `:raw_params`, `:changeset`, `:correlation_id`
 - The `result` field holds the final action result
-- Use helper functions for consistency: `assign/3`, `put_private/3`, `put_params/2`, etc.
+- Use helper functions for consistency: `assign/2`, `assign/3`, `get_private/2`, `get_private/3`, `put_private/3`, `put_params/2`, etc.
 
 ## Step Specification
 
@@ -450,12 +452,12 @@ end
 
 ## Implementation Checklist (TDD Approach)
 
-### Phase 1: Foundation & Basic Tests
-- [ ] Create basic project structure with `mix new axn --lib`
-- [ ] Write failing tests for `Axn.Context` struct and helper functions
-- [ ] Implement `Axn.Context` module to make tests pass
-- [ ] Write failing tests for basic DSL compilation (empty actions)
-- [ ] Implement minimal `Axn` macro module with `__using__/1` to make tests pass
+### Phase 1: Foundation & Basic Tests ✅ **COMPLETED**
+- [x] Create basic project structure with `mix new axn --lib`
+- [x] Write failing tests for `Axn.Context` struct and helper functions
+- [x] Implement `Axn.Context` module to make tests pass
+- [x] Write failing tests for basic DSL compilation (empty actions)
+- [x] Implement minimal `Axn` macro module with `__using__/1` to make tests pass
 
 ### Phase 2: Core DSL with TDD
 - [ ] Write failing tests for `action/2` macro functionality
