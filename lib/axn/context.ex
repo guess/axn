@@ -62,8 +62,7 @@ defmodule Axn.Context do
   end
 
   def assign(%__MODULE__{} = ctx, assigns) when is_list(assigns) do
-    assigns_map = Enum.into(assigns, %{})
-    %{ctx | assigns: Map.merge(ctx.assigns, assigns_map)}
+    assign(ctx, Enum.into(assigns, %{}))
   end
 
   @doc """

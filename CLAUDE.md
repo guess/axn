@@ -469,6 +469,12 @@ end
 - [x] Write failing tests for basic step pipeline execution
 - [x] Implement `@before_compile` hook and basic step pipeline with `Enum.reduce_while/3`
 
+### Code Optimization & Simplification ✅ **COMPLETED**
+- [x] Consolidate duplicated function resolution logic in `apply_step/2`
+- [x] Simplify `Context.assign/2` by reusing map handling for keyword lists
+- [x] Streamline result processing in `run/3` function
+- [x] Maintain all 30 passing tests through optimizations
+
 ### Phase 3: Built-in Steps with TDD
 - [ ] Write comprehensive failing tests for `:cast_validate_params` step
 - [ ] Implement `:cast_validate_params` step with schema validation and optional custom validation function

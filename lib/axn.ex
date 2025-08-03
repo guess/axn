@@ -93,8 +93,7 @@ defmodule Axn do
         case run_action_pipeline(action_name, assigns, raw_params) do
           %Axn.Context{result: {:ok, value}} -> {:ok, value}
           %Axn.Context{result: {:error, reason}} -> {:error, reason}
-          %Axn.Context{result: nil} -> {:ok, nil}
-          %Axn.Context{result: other} -> {:ok, other}
+          %Axn.Context{result: result} -> {:ok, result}
           {:error, reason} -> {:error, reason}
         end
       end
@@ -132,28 +131,21 @@ defmodule Axn do
       end
 
       defp apply_step({step_name, opts}, %Axn.Context{} = ctx) when is_atom(step_name) do
-        # Local step function call
-        case function_exported?(__MODULE__, step_name, 1) do
-          true -> 
-            apply(__MODULE__, step_name, [ctx])
-          false ->
-            case function_exported?(__MODULE__, step_name, 2) do
-              true -> apply(__MODULE__, step_name, [ctx, opts])
-              false -> {:halt, {:error, {:step_not_found, step_name}}}
-            end
-        end
+        apply_step_function(__MODULE__, step_name, ctx, opts, :step_not_found)
       end
 
       defp apply_step({{module, function}, opts}, %Axn.Context{} = ctx) do
-        # External step function call
-        case function_exported?(module, function, 1) do
-          true ->
+        apply_step_function(module, function, ctx, opts, :external_step_not_found)
+      end
+
+      defp apply_step_function(module, function, ctx, opts, error_type) do
+        cond do
+          function_exported?(module, function, 2) -> 
+            apply(module, function, [ctx, opts])
+          function_exported?(module, function, 1) -> 
             apply(module, function, [ctx])
-          false ->
-            case function_exported?(module, function, 2) do
-              true -> apply(module, function, [ctx, opts])
-              false -> {:halt, {:error, {:external_step_not_found, {module, function}}}}
-            end
+          true -> 
+            {:halt, {:error, error_type}}
         end
       end
     end
