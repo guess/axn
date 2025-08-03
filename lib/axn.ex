@@ -1,18 +1,140 @@
 defmodule Axn do
   @moduledoc """
-  Documentation for `Axn`.
+  Axn - A clean, step-based DSL library for defining actions with parameter validation,
+  authorization, telemetry, and custom business logic.
   """
 
   @doc """
-  Hello world.
-
+  Sets up a module to use the Axn DSL for defining actions.
+  
+  ## Options
+  
+  * `:telemetry_prefix` - List of atoms that form the telemetry event prefix.
+    Defaults to the module name converted to atoms.
+  
   ## Examples
-
-      iex> Axn.hello()
-      :world
-
+  
+      defmodule MyApp.UserActions do
+        use Axn, telemetry_prefix: [:my_app, :users]
+        
+        action :create_user do
+          # Action definition
+        end
+      end
   """
-  def hello do
-    :world
+  defmacro __using__(opts) do
+    telemetry_prefix = Keyword.get(opts, :telemetry_prefix, [])
+    
+    quote do
+      import Axn, only: [action: 2]
+      
+      @telemetry_prefix unquote(telemetry_prefix)
+      @actions []
+      @current_action nil
+      @steps []
+      
+      @before_compile Axn
+    end
+  end
+
+  @doc """
+  Defines an action with its steps.
+  
+  ## Examples
+  
+      action :create_user do
+        step :cast_validate_params, schema: %{name!: :string}
+        step :authorize, &can_create_users?/1
+        step :handle_create
+      end
+  """
+  defmacro action(name, do: block) do
+    quote do
+      @current_action unquote(name)
+      @steps []
+      
+      unquote(block)
+      
+      @actions [{unquote(name), @steps} | @actions]
+      @current_action nil
+      @steps []
+    end
+  end
+
+  @doc """
+  Defines a step within an action.
+  
+  ## Examples
+  
+      step :my_step
+      step :my_step, option: value
+      step {ExternalModule, :external_step}, option: value
+  """
+  defmacro step(step_spec, opts \\ []) do
+    quote do
+      @steps [@steps | [{unquote(step_spec), unquote(opts)}]]
+    end
+  end
+
+  @doc false
+  defmacro __before_compile__(_env) do
+    quote do
+      @actions Enum.reverse(@actions)
+      
+      @doc """
+      Runs an action with the given assigns and raw parameters.
+      
+      Returns `{:ok, result}` on success or `{:error, reason}` on failure.
+      """
+      def run(action_name, assigns, raw_params) do
+        case run_action_pipeline(action_name, assigns, raw_params) do
+          %Axn.Context{result: {:ok, value}} -> {:ok, value}
+          %Axn.Context{result: {:error, reason}} -> {:error, reason}
+          %Axn.Context{result: nil} -> {:ok, nil}
+          %Axn.Context{result: other} -> {:ok, other}
+          {:error, reason} -> {:error, reason}
+        end
+      end
+
+      defp run_action_pipeline(action_name, assigns, raw_params) do
+        case find_action(action_name) do
+          {:ok, steps} ->
+            ctx = %Axn.Context{
+              action: action_name,
+              assigns: assigns,
+              private: %{raw_params: raw_params}
+            }
+            run_step_pipeline(steps, ctx)
+          {:error, reason} ->
+            {:error, reason}
+        end
+      end
+
+      defp find_action(action_name) do
+        case Enum.find(@actions, fn {name, _steps} -> name == action_name end) do
+          {_name, steps} -> {:ok, steps}
+          nil -> {:error, :action_not_found}
+        end
+      end
+
+      defp run_step_pipeline(steps, %Axn.Context{} = ctx) do
+        Enum.reduce_while(steps, ctx, fn step, acc_ctx ->
+          case apply_step(step, acc_ctx) do
+            {:cont, new_ctx} -> {:cont, new_ctx}
+            {:halt, result} -> {:halt, %{acc_ctx | result: result}}
+          end
+        end)
+      end
+
+      defp apply_step({step_name, opts}, %Axn.Context{} = ctx) when is_atom(step_name) do
+        # For now, just continue with empty steps
+        {:cont, ctx}
+      end
+
+      defp apply_step({{module, function}, opts}, %Axn.Context{} = ctx) do
+        # For now, just continue with external steps
+        {:cont, ctx}
+      end
+    end
   end
 end
