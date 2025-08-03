@@ -132,13 +132,29 @@ defmodule Axn do
       end
 
       defp apply_step({step_name, opts}, %Axn.Context{} = ctx) when is_atom(step_name) do
-        # For now, just continue with empty steps
-        {:cont, ctx}
+        # Local step function call
+        case function_exported?(__MODULE__, step_name, 1) do
+          true -> 
+            apply(__MODULE__, step_name, [ctx])
+          false ->
+            case function_exported?(__MODULE__, step_name, 2) do
+              true -> apply(__MODULE__, step_name, [ctx, opts])
+              false -> {:halt, {:error, {:step_not_found, step_name}}}
+            end
+        end
       end
 
       defp apply_step({{module, function}, opts}, %Axn.Context{} = ctx) do
-        # External steps with {Module, :function} syntax
-        {:cont, ctx}
+        # External step function call
+        case function_exported?(module, function, 1) do
+          true ->
+            apply(module, function, [ctx])
+          false ->
+            case function_exported?(module, function, 2) do
+              true -> apply(module, function, [ctx, opts])
+              false -> {:halt, {:error, {:external_step_not_found, {module, function}}}}
+            end
+        end
       end
     end
   end

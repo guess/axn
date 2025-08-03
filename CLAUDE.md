@@ -461,13 +461,13 @@ end
 - [x] Write failing tests for basic DSL compilation (empty actions)
 - [x] Implement minimal `Axn` macro module with `__using__/1` to make tests pass
 
-### Phase 2: Core DSL with TDD
+### Phase 2: Core DSL with TDD ✅ **COMPLETED**
 - [x] Write failing tests for `action/2` macro functionality
 - [x] Implement `action/2` macro that collects steps
 - [x] Write failing tests for `step/1` and `step/2` macros
 - [x] Implement `step/1` and `step/2` macros
 - [x] Write failing tests for basic step pipeline execution
-- [ ] Implement `@before_compile` hook and basic step pipeline with `Enum.reduce_while/3`
+- [x] Implement `@before_compile` hook and basic step pipeline with `Enum.reduce_while/3`
 
 ### Phase 3: Built-in Steps with TDD
 - [ ] Write comprehensive failing tests for `:cast_validate_params` step
