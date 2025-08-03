@@ -6,14 +6,14 @@ defmodule Axn do
 
   @doc """
   Sets up a module to use the Axn DSL for defining actions.
-  
+
   ## Options
-  
+
   * `:telemetry_prefix` - List of atoms that form the telemetry event prefix.
     Defaults to the module name converted to atoms.
-  
+
   ## Examples
-  
+
       defmodule MyApp.UserActions do
         use Axn, telemetry_prefix: [:my_app, :users]
         
@@ -24,24 +24,24 @@ defmodule Axn do
   """
   defmacro __using__(opts) do
     telemetry_prefix = Keyword.get(opts, :telemetry_prefix, [])
-    
+
     quote do
       import Axn, only: [action: 2]
-      
+
       @telemetry_prefix unquote(telemetry_prefix)
       @actions []
       @current_action nil
       @steps []
-      
+
       @before_compile Axn
     end
   end
 
   @doc """
   Defines an action with its steps.
-  
+
   ## Examples
-  
+
       action :create_user do
         step :cast_validate_params, schema: %{name!: :string}
         step :authorize, &can_create_users?/1
@@ -52,9 +52,9 @@ defmodule Axn do
     quote do
       @current_action unquote(name)
       @steps []
-      
+
       unquote(block)
-      
+
       @actions [{unquote(name), @steps} | @actions]
       @current_action nil
       @steps []
@@ -63,9 +63,9 @@ defmodule Axn do
 
   @doc """
   Defines a step within an action.
-  
+
   ## Examples
-  
+
       step :my_step
       step :my_step, option: value
       step {ExternalModule, :external_step}, option: value
@@ -80,10 +80,10 @@ defmodule Axn do
   defmacro __before_compile__(_env) do
     quote do
       @actions Enum.reverse(@actions)
-      
+
       @doc """
       Runs an action with the given assigns and raw parameters.
-      
+
       Returns `{:ok, result}` on success or `{:error, reason}` on failure.
       """
       def run(action_name, assigns, raw_params) do
@@ -104,7 +104,9 @@ defmodule Axn do
               assigns: assigns,
               private: %{raw_params: raw_params}
             }
+
             run_step_pipeline(steps, ctx)
+
           {:error, reason} ->
             {:error, reason}
         end

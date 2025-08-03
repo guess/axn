@@ -4,7 +4,7 @@ defmodule Axn.ContextTest do
   describe "Axn.Context struct" do
     test "has correct default fields" do
       ctx = %Axn.Context{}
-      
+
       assert ctx.action == nil
       assert ctx.assigns == %{}
       assert ctx.params == %{}
@@ -35,7 +35,8 @@ defmodule Axn.ContextTest do
       updated_ctx = Axn.Context.assign(ctx, :current_user, %{id: 123})
 
       assert updated_ctx.assigns == %{current_user: %{id: 123}}
-      assert updated_ctx != ctx  # Should return new context
+      # Should return new context
+      assert updated_ctx != ctx
     end
 
     test "updates existing assignment" do
@@ -127,30 +128,30 @@ defmodule Axn.ContextTest do
       updated_ctx = Axn.Context.put_private(ctx, :raw_params, %{"name" => "John"})
 
       assert updated_ctx.private == %{
-        changeset: %{},
-        correlation_id: "abc123",
-        raw_params: %{"name" => "John"}
-      }
+               changeset: %{},
+               correlation_id: "abc123",
+               raw_params: %{"name" => "John"}
+             }
     end
   end
 
   describe "Axn.Context.get_private/2" do
     test "gets existing private value" do
       ctx = %Axn.Context{private: %{correlation_id: "abc123", changeset: %{}}}
-      
+
       assert Axn.Context.get_private(ctx, :correlation_id) == "abc123"
       assert Axn.Context.get_private(ctx, :changeset) == %{}
     end
 
     test "returns nil for non-existent key" do
       ctx = %Axn.Context{private: %{existing: "value"}}
-      
+
       assert Axn.Context.get_private(ctx, :non_existent) == nil
     end
 
     test "returns nil for empty private map" do
       ctx = %Axn.Context{}
-      
+
       assert Axn.Context.get_private(ctx, :any_key) == nil
     end
   end
@@ -158,13 +159,13 @@ defmodule Axn.ContextTest do
   describe "Axn.Context.get_private/3" do
     test "gets existing private value ignoring default" do
       ctx = %Axn.Context{private: %{correlation_id: "abc123"}}
-      
+
       assert Axn.Context.get_private(ctx, :correlation_id, "default") == "abc123"
     end
 
     test "returns default for non-existent key" do
       ctx = %Axn.Context{private: %{existing: "value"}}
-      
+
       assert Axn.Context.get_private(ctx, :non_existent, "my_default") == "my_default"
       assert Axn.Context.get_private(ctx, :non_existent, :atom_default) == :atom_default
       assert Axn.Context.get_private(ctx, :non_existent, nil) == nil
@@ -172,7 +173,7 @@ defmodule Axn.ContextTest do
 
     test "returns default for empty private map" do
       ctx = %Axn.Context{}
-      
+
       assert Axn.Context.get_private(ctx, :any_key, "default_value") == "default_value"
     end
   end
@@ -211,5 +212,4 @@ defmodule Axn.ContextTest do
       assert updated_ctx.result == {:ok, "success"}
     end
   end
-
 end
