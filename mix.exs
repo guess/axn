@@ -38,8 +38,8 @@ defmodule Axn.MixProject do
 
   defp description do
     """
-    A clean, step-based DSL library for defining actions with parameter validation, 
-    authorization, telemetry, and custom business logic. Prioritizes simplicity, 
+    A clean, step-based DSL library for defining actions with parameter validation,
+    authorization, telemetry, and custom business logic. Prioritizes simplicity,
     explicitness, and ease of following execution flow.
     """
   end
@@ -63,10 +63,7 @@ defmodule Axn.MixProject do
       source_url: @source_url,
       extras: [
         "README.md",
-        "CHANGELOG.md",
-        "docs/testing.md",
-        "docs/telemetry.md",
-        "docs/advanced.md"
+        "CHANGELOG.md"
       ],
       groups_for_extras: [
         Guides: ~r/docs\/.*/

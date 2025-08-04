@@ -168,8 +168,6 @@ defmodule MyApp.UserActions do
 end
 ```
 
-See [Telemetry Guide](docs/telemetry.md) for advanced configuration.
-
 ## Unified Phoenix Integration
 
 **The Problem:** Plugs work with Controllers but not LiveViews, creating code duplication.
@@ -195,8 +193,6 @@ test "create_user succeeds with valid input" do
   assert user.email == "test@example.com"
 end
 ```
-
-See [Testing Guide](docs/testing.md) for comprehensive test helpers.
 
 ## Error Handling
 
@@ -230,12 +226,6 @@ end
 - Minimal overhead when telemetry is disabled
 - Efficient pipeline using `Enum.reduce_while/3`
 - Steps are pure functions, easy to optimize
-
-## Advanced Usage
-
-For complex patterns, see:
-- [Advanced Guide](docs/advanced.md) - Complex validation and external steps
-- [Testing Guide](docs/testing.md) - Comprehensive test patterns
 
 ## Comparison
 
