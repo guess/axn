@@ -8,12 +8,15 @@ defmodule Axn.Steps.CastValidateParams do
 
   import Axn.Context
 
+  @type validate_fun :: (Ecto.Changeset.t() -> Ecto.Changeset.t())
+
   def cast_validate_params(%Axn.Context{} = ctx, opts) do
     schema = Keyword.fetch!(opts, :schema)
     validate_fn = Keyword.get(opts, :validate)
     raw_params = ctx.params
+    changeset = handle_cast_params(raw_params, schema)
 
-    case cast_and_validate_params(raw_params, schema, validate_fn) do
+    case handle_validate_params(changeset, validate_fn) do
       {:ok, params, changeset} ->
         new_ctx =
           ctx
@@ -30,27 +33,36 @@ defmodule Axn.Steps.CastValidateParams do
     end
   end
 
-  defp cast_and_validate_params(raw_params, schema, validate_fn) do
+  @spec handle_cast_params(map(), map()) :: Ecto.Changeset.t()
+  defp handle_cast_params(raw_params, schema) do
     # Create a dynamic module using the params library
     dynamic_module = create_dynamic_params_module(schema)
 
     # Create changeset using the dynamic module
-    changeset = dynamic_module.from(raw_params)
+    dynamic_module.from(raw_params)
+  end
 
-    # Apply custom validation function if provided
-    final_changeset =
-      if validate_fn do
-        validate_fn.(changeset)
-      else
-        changeset
-      end
+  @spec handle_validate_params(Ecto.Changeset.t(), validate_fun() | nil) ::
+          {:ok, map(), Ecto.Changeset.t()} | {:error, Ecto.Changeset.t()}
+  defp handle_validate_params(changeset, validate_fn) do
+    changeset
+    |> apply_validate_fun(validate_fn)
+    |> case do
+      %{valid?: true} = changeset ->
+        params = Params.to_map(changeset)
+        {:ok, params, changeset}
 
-    if final_changeset.valid? do
-      params = Params.to_map(final_changeset)
-      {:ok, params, final_changeset}
-    else
-      {:error, final_changeset}
+      changeset ->
+        {:error, changeset}
     end
+  end
+
+  defp apply_validate_fun(changeset, validate_fn) when is_function(validate_fn) do
+    validate_fn.(changeset)
+  end
+
+  defp apply_validate_fun(changeset, _validate_fn) do
+    changeset
   end
 
   defp create_dynamic_params_module(schema) do
