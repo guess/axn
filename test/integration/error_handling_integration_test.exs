@@ -1,5 +1,6 @@
 defmodule Integration.ErrorHandlingIntegrationTest do
   use ExUnit.Case
+
   @moduletag :integration
 
   describe "end-to-end error handling" do

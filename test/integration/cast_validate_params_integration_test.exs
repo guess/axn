@@ -1,5 +1,6 @@
 defmodule Integration.CastValidateParamsIntegrationTest do
   use ExUnit.Case
+
   @moduletag :integration
 
   describe "parameter validation and type casting" do

@@ -1,5 +1,6 @@
 defmodule Integration.AxnDslIntegrationTest do
   use ExUnit.Case
+
   @moduletag :integration
 
   describe "basic DSL integration" do

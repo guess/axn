@@ -1,5 +1,6 @@
 defmodule Integration.AuthorizationPatternsIntegrationTest do
   use ExUnit.Case
+
   @moduletag :integration
 
   describe "authorization patterns" do
