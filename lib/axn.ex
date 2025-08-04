@@ -84,6 +84,16 @@ defmodule Axn do
     quote do
       @actions Enum.reverse(@actions)
 
+      unquote(generate_run_function())
+      unquote(generate_result_helpers())
+      unquote(generate_pipeline_functions())
+      unquote(generate_telemetry_functions())
+      unquote(generate_step_execution_functions())
+    end
+  end
+
+  defp generate_run_function do
+    quote do
       @doc """
       Runs an action with the given assigns and raw parameters.
 
@@ -95,12 +105,27 @@ defmodule Axn do
           {:error, reason} -> {:error, reason}
         end
       end
+    end
+  end
 
+  defp generate_result_helpers do
+    quote do
       defp normalize_result({:ok, value}), do: {:ok, value}
       defp normalize_result({:error, reason}), do: {:error, reason}
       defp normalize_result(nil), do: {:ok, nil}
       defp normalize_result(other), do: {:ok, other}
 
+      defp find_action(action_name) do
+        case Enum.find(@actions, fn {name, _steps} -> name == action_name end) do
+          {_name, steps} -> {:ok, steps}
+          nil -> {:error, :action_not_found}
+        end
+      end
+    end
+  end
+
+  defp generate_pipeline_functions do
+    quote do
       defp run_action_pipeline(action_name, assigns, raw_params) do
         case find_action(action_name) do
           {:ok, steps} ->
@@ -117,6 +142,19 @@ defmodule Axn do
         end
       end
 
+      defp run_step_pipeline(steps, %Axn.Context{} = ctx) do
+        Enum.reduce_while(steps, ctx, fn step, acc_ctx ->
+          case apply_step(step, acc_ctx) do
+            {:cont, new_ctx} -> {:cont, new_ctx}
+            {:halt, result} -> {:halt, %{acc_ctx | result: result}}
+          end
+        end)
+      end
+    end
+  end
+
+  defp generate_telemetry_functions do
+    quote do
       defp run_action_with_telemetry(%Axn.Context{} = ctx, steps) do
         metadata = extract_safe_metadata(ctx)
 
@@ -132,7 +170,6 @@ defmodule Axn do
           )
         rescue
           exception ->
-            # Preserve exception information for debugging
             %{
               ctx
               | result: {:error, %{reason: :step_exception, message: Exception.message(exception)}}
@@ -152,23 +189,11 @@ defmodule Axn do
         do: to_string(id)
 
       defp get_user_id(_), do: nil
+    end
+  end
 
-      defp find_action(action_name) do
-        case Enum.find(@actions, fn {name, _steps} -> name == action_name end) do
-          {_name, steps} -> {:ok, steps}
-          nil -> {:error, :action_not_found}
-        end
-      end
-
-      defp run_step_pipeline(steps, %Axn.Context{} = ctx) do
-        Enum.reduce_while(steps, ctx, fn step, acc_ctx ->
-          case apply_step(step, acc_ctx) do
-            {:cont, new_ctx} -> {:cont, new_ctx}
-            {:halt, result} -> {:halt, %{acc_ctx | result: result}}
-          end
-        end)
-      end
-
+  defp generate_step_execution_functions do
+    quote do
       defp apply_step({step_name, opts}, %Axn.Context{} = ctx) when is_atom(step_name) do
         case step_name do
           :cast_validate_params ->
