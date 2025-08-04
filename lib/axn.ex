@@ -3,7 +3,7 @@ defmodule Axn do
   Axn - A clean, step-based DSL library for defining actions with parameter validation,
   authorization, telemetry, and custom business logic.
 
-  Axn provides a unified interface that works seamlessly across Phoenix Controllers 
+  Axn provides a unified interface that works seamlessly across Phoenix Controllers
   and LiveViews, solving the limitation that Plugs only work with `Plug.Conn`.
 
   ## Core Features
@@ -19,29 +19,29 @@ defmodule Axn do
   ## Key Concepts
 
   ### Actions
-  Actions are named units of work that execute a series of steps in order. Each action 
+  Actions are named units of work that execute a series of steps in order. Each action
   automatically gets telemetry wrapping and error handling.
 
-  ### Steps  
-  Steps are individual functions that take a context and either continue the pipeline 
+  ### Steps
+  Steps are individual functions that take a context and either continue the pipeline
   or halt it. Steps follow a simple contract: `(ctx, opts) -> {:cont, new_ctx} | {:halt, result}`.
 
   ### Context
-  An `Axn.Context` struct flows through the step pipeline, carrying request data, user 
-  information, and any step-added fields. Provides helper functions similar to `Plug.Conn` 
+  An `Axn.Context` struct flows through the step pipeline, carrying request data, user
+  information, and any step-added fields. Provides helper functions similar to `Plug.Conn`
   and `Phoenix.Component`.
 
   ## Quick Example
 
       defmodule MyApp.UserActions do
         use Axn
-        
+
         action :create_user do
           step :cast_validate_params, schema: %{email!: :string, name!: :string}
           step :require_admin
           step :handle_create
         end
-        
+
         def require_admin(ctx) do
           if admin?(ctx.assigns.current_user) do
             {:cont, ctx}
@@ -49,14 +49,14 @@ defmodule Axn do
             {:halt, {:error, :unauthorized}}
           end
         end
-        
+
         def handle_create(ctx) do
           case Users.create(ctx.params) do
             {:ok, user} -> {:halt, {:ok, user}}
             {:error, reason} -> {:halt, {:error, reason}}
           end
         end
-        
+
         defp admin?(user), do: user && user.role == "admin"
       end
 
@@ -72,7 +72,7 @@ defmodule Axn do
         end
       end
 
-      # Phoenix LiveView  
+      # Phoenix LiveView
       def handle_event("submit", params, socket) do
         case MyApp.UserActions.run(:create_user, params, socket) do
           {:ok, user} -> {:noreply, assign(socket, :user, user)}
@@ -83,7 +83,7 @@ defmodule Axn do
   ## Design Principles
 
   * **Explicit over implicit**: Each action clearly shows its execution flow
-  * **Composable**: Steps should be reusable across actions and modules  
+  * **Composable**: Steps should be reusable across actions and modules
   * **Safe by default**: Telemetry and error handling do not leak sensitive data
   * **Simple to implement**: Minimal macro magic, straightforward execution model
   * **Easy to test**: Steps are pure functions that are easy to unit test
@@ -94,6 +94,7 @@ defmodule Axn do
   """
 
   alias Axn.Steps.CastValidateParams
+  alias Axn.Telemetry
 
   @doc """
   Sets up a module to use the Axn DSL for defining actions.
@@ -133,6 +134,7 @@ defmodule Axn do
 
       alias Axn.Context
 
+      @module_opts unquote(opts)
       @telemetry_metadata_fn unquote(metadata_fn)
       @actions []
       @current_action nil
@@ -217,13 +219,13 @@ defmodule Axn do
 
       # Step with no options
       step :my_step
-      
-      # Step with options  
+
+      # Step with options
       step :my_step, option: value
-      
+
       # External step from another module
       step {ExternalModule, :external_step}, option: value
-      
+
       # Built-in parameter validation step
       step :cast_validate_params, schema: %{name!: :string, age: :integer}
 
@@ -233,13 +235,13 @@ defmodule Axn do
       def my_step(ctx) do
         {:cont, Context.assign(ctx, :processed, true)}
       end
-      
+
       # Step with options that modifies context
       def my_step_with_options(ctx, opts) do
         value = Keyword.get(opts, :option, "default")
         {:cont, Context.assign(ctx, :custom_value, value)}
       end
-      
+
       # Step that can halt the pipeline
       def require_admin(ctx) do
         if admin?(ctx.assigns.current_user) do
@@ -248,7 +250,7 @@ defmodule Axn do
           {:halt, {:error, :unauthorized}}
         end
       end
-      
+
       # Step that completes the action
       def handle_create(ctx) do
         case create_user(ctx.params) do
@@ -271,7 +273,6 @@ defmodule Axn do
       unquote(generate_run_function())
       unquote(generate_result_helpers())
       unquote(generate_pipeline_functions())
-      unquote(generate_telemetry_functions())
       unquote(generate_step_execution_functions())
     end
   end
@@ -316,7 +317,7 @@ defmodule Axn do
       * `{:error, :step_not_found}` - A step function couldn't be found
       ### Parameter Validation Errors
       * `{:error, %{reason: :invalid_params, changeset: changeset}}` - Parameter validation failed
-        
+
         The changeset contains field-level validation errors and can be used to
         generate user-friendly error messages.
 
@@ -333,7 +334,7 @@ defmodule Axn do
       ### Phoenix Controller Usage
           def create(conn, params) do
             case MyApp.UserActions.run(:create_user, params, conn) do
-              {:ok, user} -> 
+              {:ok, user} ->
                 json(conn, %{success: true, user: user})
               {:error, %{reason: :invalid_params, changeset: changeset}} ->
                 conn
@@ -353,11 +354,11 @@ defmodule Axn do
       ### Phoenix LiveView Usage
           def handle_event("submit", params, socket) do
             case MyApp.FormActions.run(:submit_form, params, socket) do
-              {:ok, result} -> 
+              {:ok, result} ->
                 {:noreply, socket |> put_flash(:info, "Success!") |> assign(:result, result)}
               {:error, %{reason: :invalid_params, changeset: changeset}} ->
                 {:noreply, assign(socket, :changeset, changeset)}
-              {:error, reason} -> 
+              {:error, reason} ->
                 {:noreply, put_flash(socket, :error, "Error: \#{inspect(reason)}")}
             end
           end
@@ -373,7 +374,7 @@ defmodule Axn do
 
       All action executions automatically emit telemetry events:
       * `[:axn, :action, :start]` - When action begins
-      * `[:axn, :action, :stop]` - When action completes successfully  
+      * `[:axn, :action, :stop]` - When action completes successfully
       * `[:axn, :action, :exception]` - When action fails with exception
 
       Events include metadata such as module, action name, duration, and any
@@ -420,13 +421,19 @@ defmodule Axn do
             {assigns, original_source} = extract_assigns_and_source(source)
 
             ctx = %Axn.Context{
+              module: __MODULE__,
               action: action,
               assigns: assigns,
               params: params,
               private: %{source: original_source}
             }
 
-            run_action_with_telemetry(ctx, steps, action_opts)
+            Telemetry.run_with_telemetry(
+              ctx,
+              action_opts,
+              @module_opts,
+              fn -> run_step_pipeline(steps, ctx) end
+            )
 
           {:error, reason} ->
             {:error, reason}
@@ -440,80 +447,6 @@ defmodule Axn do
             {:halt, result} -> {:halt, %{acc_ctx | result: result}}
           end
         end)
-      end
-    end
-  end
-
-  defp generate_telemetry_functions do
-    quote do
-      # Wraps action execution with telemetry events.
-      #
-      # Emits :telemetry.span/3 events with the following structure:
-      # - Event name: [:axn, :action]
-      # - Start metadata: %{module: __MODULE__, action: action_name, ...custom...}  
-      # - Stop metadata: Same as start, plus any context changes during execution
-      # - Exception metadata: Same as start, plus exception details
-      #
-      # Custom metadata functions are called safely and default to %{} on error.
-      defp run_action_with_telemetry(%Axn.Context{} = ctx, steps, action_opts) do
-        metadata = build_telemetry_metadata(ctx, action_opts)
-
-        try do
-          :telemetry.span(
-            [:axn, :action],
-            metadata,
-            fn ->
-              result_ctx = run_step_pipeline(steps, ctx)
-              final_metadata = build_telemetry_metadata(result_ctx, action_opts)
-              {result_ctx, final_metadata}
-            end
-          )
-        rescue
-          exception ->
-            %{
-              ctx
-              | result: {:error, %{reason: :step_exception, message: Exception.message(exception)}}
-            }
-        end
-      end
-
-      # Builds telemetry metadata by merging default, module-level, and action-level metadata.
-      #
-      # Metadata precedence (later metadata overwrites earlier on key conflicts):
-      # 1. Default metadata: %{module: __MODULE__, action: ctx.action}
-      # 2. Module-level metadata: Configured via `use Axn, metadata: &function/1`
-      # 3. Action-level metadata: Configured via `action :name, metadata: &function/1`
-      #
-      # All custom metadata functions are called safely and return %{} on error.
-      defp build_telemetry_metadata(%Axn.Context{} = ctx, action_opts) do
-        # Always include module and action for filtering/debugging
-        %{module: __MODULE__, action: ctx.action}
-        |> Map.merge(get_module_metadata(ctx))
-        |> Map.merge(get_action_metadata(ctx, action_opts))
-      end
-
-      defp get_action_metadata(ctx, action_opts) do
-        action_opts
-        |> Keyword.get(:metadata)
-        |> safe_call_metadata_fn(ctx)
-      end
-
-      defp get_module_metadata(ctx) do
-        safe_call_metadata_fn(@telemetry_metadata_fn, ctx)
-      end
-
-      # Safely calls a metadata function, returning %{} on any error.
-      #
-      # This ensures that telemetry never fails due to custom metadata functions
-      # and provides a consistent fallback behavior.
-      defp safe_call_metadata_fn(metadata_fn, ctx) when is_function(metadata_fn) do
-        metadata_fn.(ctx) || %{}
-      rescue
-        _ -> %{}
-      end
-
-      defp safe_call_metadata_fn(_metadata_fn, _ctx) do
-        %{}
       end
     end
   end

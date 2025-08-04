@@ -6,6 +6,8 @@ defmodule Axn.Context do
   """
 
   defstruct [
+    # module() - The current module action
+    :module,
     # atom() - Current action name
     :action,
     # map() - Phoenix-style assigns (includes current_user, etc.)
@@ -19,6 +21,7 @@ defmodule Axn.Context do
   ]
 
   @type t :: %__MODULE__{
+          module: module() | nil,
           action: atom() | nil,
           assigns: map(),
           params: map(),
