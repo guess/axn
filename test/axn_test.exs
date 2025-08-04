@@ -143,8 +143,8 @@ defmodule AxnTest do
           step :build_result
 
           def check_inputs(ctx) do
-            # Verify we can access raw_params, assigns, and action name
-            raw_params = get_private(ctx, :raw_params)
+            # Verify we can access raw_params (now in ctx.params), assigns, and action name
+            raw_params = ctx.params
             assigns = ctx.assigns
             action_name = ctx.action
 

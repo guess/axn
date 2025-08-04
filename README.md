@@ -106,11 +106,21 @@ step_function(ctx, opts) -> {:cont, new_ctx} | {:halt, result}
 An `Axn.Context` struct flows through the step pipeline, carrying request data, user information, and step-added fields.
 
 ```elixir
+# Before parameter validation
+%Axn.Context{
+  action: :create_user,              # Current action name
+  assigns: %{current_user: user},    # Phoenix-style assigns
+  params: %{"email" => "...", "name" => "..."},  # Raw parameters initially
+  private: %{},                      # Internal DSL state
+  result: nil                        # Action result
+}
+
+# After cast_validate_params step
 %Axn.Context{
   action: :create_user,              # Current action name
   assigns: %{current_user: user},    # Phoenix-style assigns
   params: %{email: "...", name: "..."},  # Cast and validated parameters
-  private: %{raw_params: %{}, changeset: #Changeset<>},  # Internal DSL state
+  private: %{raw_params: %{"email" => "...", "name" => "..."}, changeset: #Changeset<>},
   result: nil                        # Action result
 }
 ```

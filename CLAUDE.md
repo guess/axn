@@ -79,12 +79,21 @@ defstruct [
   result: nil     # any() - Action result
 ]
 
-# Example context
+# Example context (before parameter validation)
 %Axn.Context{
   action: :create_user,
   assigns: %{current_user: %User{id: 123}},
-  params: %{email: "user@example.com", name: "John"},
-  private: %{raw_params: %{"email" => "user@example.com"}, changeset: #Changeset<>},
+  params: %{"email" => "user@example.com", "name" => "John"},  # Raw params initially
+  private: %{},
+  result: nil
+}
+
+# Example context (after parameter validation with cast_validate_params)
+%Axn.Context{
+  action: :create_user,
+  assigns: %{current_user: %User{id: 123}},
+  params: %{email: "user@example.com", name: "John"},  # Cast and validated params
+  private: %{raw_params: %{"email" => "user@example.com", "name" => "John"}, changeset: #Changeset<>},
   result: nil
 }
 ```
@@ -117,7 +126,8 @@ Context.put_result(ctx, {:ok, user})
 - Steps may modify context using helper functions or direct struct updates
 - Steps should never remove core fields (action, assigns, params, private, result)
 - Follow Phoenix conventions: user data goes in `assigns`, internal state in `private`
-- Common private fields: `:raw_params`, `:changeset`, `:correlation_id`
+- **Parameter Flow**: Raw params start in `ctx.params`. When `cast_validate_params` runs, raw params are preserved in `ctx.private.raw_params` and cast params replace `ctx.params`
+- Common private fields: `:raw_params` (after validation), `:changeset`, `:correlation_id`
 - The `result` field holds the final action result
 - Use helper functions for consistency: `assign/2`, `assign/3`, `get_private/2`, `get_private/3`, `put_private/3`, `put_params/2`, etc.
 

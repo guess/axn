@@ -108,14 +108,10 @@ defmodule AxnSpecificationPatternsTest do
       # Missing name
       params = %{"email" => "test@example.com"}
 
-      assert_action_fails(
-        ComplexActions.run(:create_user, assigns, params),
-        %{reason: :invalid_params, changeset: changeset},
-        fn error_details ->
-          refute error_details.changeset.valid?
-          assert error_details.changeset.errors[:name]
-        end
-      )
+      result = ComplexActions.run(:create_user, assigns, params)
+      assert {:error, %{reason: :invalid_params, changeset: changeset}} = result
+      refute changeset.valid?
+      assert changeset.errors[:name]
     end
   end
 
@@ -162,7 +158,7 @@ defmodule AxnSpecificationPatternsTest do
         end
 
         def handle_request(ctx) do
-          otp_code = :rand.uniform(999_999) |> Integer.to_string() |> String.pad_leading(6, "0")
+          _otp_code = :rand.uniform(999_999) |> Integer.to_string() |> String.pad_leading(6, "0")
 
           result = %{
             message: "OTP sent",
@@ -205,13 +201,10 @@ defmodule AxnSpecificationPatternsTest do
         "challenge_token" => "abcdef123"
       }
 
-      assert_action_fails(
-        CustomValidationActions.run(:request_otp, assigns, params),
-        %{reason: :invalid_params, changeset: changeset}
-      ) do
-        refute changeset.valid?
-        assert {"must start with +", []} in changeset.errors[:phone]
-      end
+      result = CustomValidationActions.run(:request_otp, assigns, params)
+      assert {:error, %{reason: :invalid_params, changeset: changeset}} = result
+      refute changeset.valid?
+      assert changeset.errors[:phone] == {"must start with +", []}
     end
 
     test "fails custom token validation" do
@@ -223,13 +216,10 @@ defmodule AxnSpecificationPatternsTest do
         "challenge_token" => "abc"
       }
 
-      assert_action_fails(
-        CustomValidationActions.run(:request_otp, assigns, params),
-        %{reason: :invalid_params, changeset: changeset}
-      ) do
-        refute changeset.valid?
-        assert {"must be at least 6 characters", []} in changeset.errors[:challenge_token]
-      end
+      result = CustomValidationActions.run(:request_otp, assigns, params)
+      assert {:error, %{reason: :invalid_params, changeset: changeset}} = result
+      refute changeset.valid?
+      assert changeset.errors[:challenge_token] == {"must be at least 6 characters", []}
     end
 
     test "uses default region value" do
@@ -426,7 +416,7 @@ defmodule AxnSpecificationPatternsTest do
       # Pattern 1: Simple role check
       action :admin_only_action do
         step :require_admin
-        step :handle_action
+        step :handle_admin_action
 
         def require_admin(ctx) do
           if admin?(ctx.assigns.current_user) do
@@ -436,7 +426,7 @@ defmodule AxnSpecificationPatternsTest do
           end
         end
 
-        def handle_action(ctx) do
+        def handle_admin_action(_ctx) do
           {:halt, {:ok, "admin action completed"}}
         end
 
@@ -447,7 +437,7 @@ defmodule AxnSpecificationPatternsTest do
       action :user_access_action do
         step :cast_validate_params, schema: %{user_id!: :integer}
         step :authorize_user_access
-        step :handle_action
+        step :handle_user_access
 
         def authorize_user_access(ctx) do
           if can_access?(ctx.assigns.current_user, ctx.params.user_id) do
@@ -457,7 +447,7 @@ defmodule AxnSpecificationPatternsTest do
           end
         end
 
-        def handle_action(ctx) do
+        def handle_user_access(_ctx) do
           {:halt, {:ok, "user access granted"}}
         end
 
@@ -469,7 +459,7 @@ defmodule AxnSpecificationPatternsTest do
       # Pattern 3: Action-based authorization
       action :action_based_auth do
         step :authorize_action
-        step :handle_action
+        step :handle_action_auth
 
         def authorize_action(ctx) do
           if allowed?(ctx.assigns.current_user, ctx.action) do
@@ -479,7 +469,7 @@ defmodule AxnSpecificationPatternsTest do
           end
         end
 
-        def handle_action(ctx) do
+        def handle_action_auth(_ctx) do
           {:halt, {:ok, "action authorized"}}
         end
 
@@ -564,7 +554,7 @@ defmodule AxnSpecificationPatternsTest do
       action :test_action do
         step :handle_test
 
-        def handle_test(ctx) do
+        def handle_test(_ctx) do
           {:halt, {:ok, "test completed"}}
         end
       end
@@ -577,7 +567,7 @@ defmodule AxnSpecificationPatternsTest do
       action :test_action do
         step :handle_test
 
-        def handle_test(ctx) do
+        def handle_test(_ctx) do
           {:halt, {:ok, "test completed"}}
         end
       end
@@ -605,7 +595,7 @@ defmodule AxnSpecificationPatternsTest do
       assert stop_event == [:spec_test, :custom, :stop]
       assert start_metadata.action == :test_action
       assert stop_metadata.action == :test_action
-      assert stop_metadata.user_id == 123
+      assert stop_metadata.user_id == "123"
       assert stop_metadata.result_type == :ok
     end
 

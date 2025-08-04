@@ -246,10 +246,8 @@ defmodule AxnEndToEndIntegrationTest do
           [:test_app, :auth, :start],
           [:test_app, :auth, :stop]
         ],
-        fn event, measurements, metadata, _config ->
-          send(test_pid, {:telemetry, event, measurements, metadata})
-        end,
-        nil
+        &__MODULE__.handle_telemetry_event/4,
+        test_pid
       )
 
       on_exit(fn -> :telemetry.detach("test-telemetry") end)
@@ -268,7 +266,7 @@ defmodule AxnEndToEndIntegrationTest do
       assert_receive {:telemetry, [:test_app, :users, :stop], measurements, metadata}
       assert metadata.action == :create_user
       assert metadata.result_type == :ok
-      assert metadata.user_id == 123
+      assert metadata.user_id == "123"
       assert is_integer(measurements.duration)
     end
 
@@ -317,7 +315,7 @@ defmodule AxnEndToEndIntegrationTest do
       assigns = %{}
       params = %{}
 
-      assert {:error, %{reason: :step_error}} =
+      assert {:error, %{reason: :step_exception}} =
                ErrorTestActions.run(:step_raises_exception, assigns, params)
     end
 
@@ -325,8 +323,13 @@ defmodule AxnEndToEndIntegrationTest do
       assigns = %{}
       params = %{}
 
-      assert {:error, %{reason: :step_error}} =
+      assert {:error, %{reason: :step_exception}} =
                ErrorTestActions.run(:step_returns_invalid_format, assigns, params)
     end
+  end
+
+  @doc false
+  def handle_telemetry_event(event, measurements, metadata, test_pid) do
+    send(test_pid, {:telemetry, event, measurements, metadata})
   end
 end

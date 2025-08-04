@@ -11,12 +11,15 @@ defmodule Axn.Steps.CastValidateParams do
   def cast_validate_params(%Axn.Context{} = ctx, opts) do
     schema = Keyword.fetch!(opts, :schema)
     validate_fn = Keyword.get(opts, :validate)
-    raw_params = get_private(ctx, :raw_params)
+    raw_params = ctx.params
 
     case cast_and_validate_params(raw_params, schema, validate_fn) do
       {:ok, params, changeset} ->
         new_ctx =
           ctx
+          # Preserve raw params in private
+          |> put_private(:raw_params, raw_params)
+          # Replace with cast params
           |> put_params(params)
           |> put_private(:changeset, changeset)
 

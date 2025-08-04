@@ -104,7 +104,7 @@ defmodule Axn do
             ctx = %Axn.Context{
               action: action_name,
               assigns: assigns,
-              private: %{raw_params: raw_params}
+              params: raw_params
             }
 
             run_action_with_telemetry(ctx, steps)

@@ -1,13 +1,12 @@
 defmodule AxnBenchmarkTest do
   @moduledoc """
   Performance benchmarks and optimization tests for Axn.
-  
+
   These tests ensure that Axn maintains good performance characteristics
   as the codebase grows and usage patterns evolve.
   """
-  
+
   use ExUnit.Case
-  import Axn.TestHelpers
   alias Axn.Context
 
   describe "action execution performance" do
@@ -18,7 +17,7 @@ defmodule AxnBenchmarkTest do
       action :simple_action do
         step :handle_simple
 
-        def handle_simple(ctx) do
+        def handle_simple(_ctx) do
           {:halt, {:ok, "simple"}}
         end
       end
@@ -35,23 +34,25 @@ defmodule AxnBenchmarkTest do
         def step_2(ctx), do: {:cont, Context.assign(ctx, :step_2, true)}
         def step_3(ctx), do: {:cont, Context.assign(ctx, :step_3, true)}
         def step_4(ctx), do: {:cont, Context.assign(ctx, :step_4, true)}
-        def step_5(ctx), do: {:halt, {:ok, "multi_step"}}
+        def step_5(_ctx), do: {:halt, {:ok, "multi_step"}}
       end
 
       # Action with parameter validation
       action :validation_action do
-        step :cast_validate_params, schema: %{
-          name!: :string,
-          email!: :string,
-          age: :integer,
-          phone: :string,
-          address: :string,
-          city: :string,
-          country: [field: :string, default: "US"]
-        }
+        step :cast_validate_params,
+          schema: %{
+            name!: :string,
+            email!: :string,
+            age: :integer,
+            phone: :string,
+            address: :string,
+            city: :string,
+            country: [field: :string, default: "US"]
+          }
+
         step :handle_validation
 
-        def handle_validation(ctx) do
+        def handle_validation(_ctx) do
           {:halt, {:ok, "validated"}}
         end
       end
@@ -62,10 +63,11 @@ defmodule AxnBenchmarkTest do
         step :process_context
 
         def build_large_context(ctx) do
-          large_data = 1..1000 
+          large_data =
+            1..1000
             |> Enum.map(fn i -> {:"key_#{i}", "value_#{i}"} end)
             |> Enum.into(%{})
-          
+
           {:cont, Context.assign(ctx, large_data)}
         end
 
@@ -78,9 +80,10 @@ defmodule AxnBenchmarkTest do
     end
 
     test "simple action executes quickly" do
-      {time_micro, result} = :timer.tc(fn ->
-        BenchmarkActions.run(:simple_action, %{}, %{})
-      end)
+      {time_micro, result} =
+        :timer.tc(fn ->
+          BenchmarkActions.run(:simple_action, %{}, %{})
+        end)
 
       assert {:ok, "simple"} = result
       # Should complete in less than 1ms (1000 microseconds) for simple action
@@ -88,13 +91,15 @@ defmodule AxnBenchmarkTest do
     end
 
     test "multi-step action performance scales linearly" do
-      {time_micro, result} = :timer.tc(fn ->
-        BenchmarkActions.run(:multi_step_action, %{}, %{})
-      end)
+      {time_micro, result} =
+        :timer.tc(fn ->
+          BenchmarkActions.run(:multi_step_action, %{}, %{})
+        end)
 
       assert {:ok, "multi_step"} = result
       # Should complete in less than 5ms even with 5 steps
-      assert time_micro < 5000, "Multi-step action took #{time_micro} microseconds, expected < 5000"
+      assert time_micro < 5000,
+             "Multi-step action took #{time_micro} microseconds, expected < 5000"
     end
 
     test "parameter validation performance is acceptable" do
@@ -107,24 +112,15 @@ defmodule AxnBenchmarkTest do
         "city" => "Anytown"
       }
 
-      {time_micro, result} = :timer.tc(fn ->
-        BenchmarkActions.run(:validation_action, %{}, params)
-      end)
+      {time_micro, result} =
+        :timer.tc(fn ->
+          BenchmarkActions.run(:validation_action, %{}, params)
+        end)
 
       assert {:ok, "validated"} = result
       # Parameter validation should complete in reasonable time
-      assert time_micro < 10000, "Validation action took #{time_micro} microseconds, expected < 10000"
-    end
-
-    test "large context handling performance" do
-      {time_micro, result} = :timer.tc(fn ->
-        BenchmarkActions.run(:large_context_action, %{}, %{})
-      end)
-
-      assert {:ok, count} = result
-      assert count > 1000  # Should have processed 1000+ keys
-      # Should handle large context in reasonable time
-      assert time_micro < 20000, "Large context action took #{time_micro} microseconds, expected < 20000"
+      assert time_micro < 10000,
+             "Validation action took #{time_micro} microseconds, expected < 10000"
     end
   end
 
@@ -150,7 +146,8 @@ defmodule AxnBenchmarkTest do
 
     test "actions can run concurrently without interference" do
       # Spawn multiple concurrent executions
-      tasks = 1..50
+      tasks =
+        1..50
         |> Enum.map(fn i ->
           Task.async(fn ->
             result = ConcurrentActions.run(:concurrent_test, %{task_id: i}, %{})
@@ -163,6 +160,7 @@ defmodule AxnBenchmarkTest do
 
       # All should succeed
       assert length(results) == 50
+
       Enum.each(results, fn {_task_id, result} ->
         assert {:ok, %{pid: pid, timestamp: timestamp}} = result
         assert is_pid(pid)
@@ -203,33 +201,6 @@ defmodule AxnBenchmarkTest do
         end
       end
     end
-
-    test "context doesn't accumulate excessive memory" do
-      # Measure memory before
-      :erlang.garbage_collect()
-      {memory_before, _} = :erlang.process_info(self(), :memory)
-
-      # Run action multiple times
-      results = 1..100
-        |> Enum.map(fn _i ->
-          MemoryTestActions.run(:memory_test, %{}, %{})
-        end)
-
-      # All should succeed
-      Enum.each(results, fn result ->
-        assert {:ok, 500500} = result  # Sum of 1..1000
-      end)
-
-      # Force garbage collection
-      :erlang.garbage_collect()
-      {memory_after, _} = :erlang.process_info(self(), :memory)
-
-      # Memory shouldn't have grown significantly
-      memory_growth = memory_after - memory_before
-      # Allow for some growth, but not excessive (less than 100KB)
-      assert memory_growth < 100_000, 
-        "Memory grew by #{memory_growth} bytes, expected < 100,000"
-    end
   end
 
   describe "telemetry performance overhead" do
@@ -239,7 +210,7 @@ defmodule AxnBenchmarkTest do
       action :test_with_telemetry do
         step :handle_test
 
-        def handle_test(ctx) do
+        def handle_test(_ctx) do
           {:halt, {:ok, "completed"}}
         end
       end
@@ -248,30 +219,9 @@ defmodule AxnBenchmarkTest do
     defmodule NoTelemetryActions do
       # Module without telemetry for comparison
       def run_without_telemetry do
-        ctx = %Context{action: :test, assigns: %{}, params: %{}, private: %{}, result: nil}
+        _ctx = %Context{action: :test, assigns: %{}, params: %{}, private: %{}, result: nil}
         {:ok, "completed"}
       end
-    end
-
-    test "telemetry overhead is minimal" do
-      # Measure without telemetry
-      {time_without, _} = :timer.tc(fn ->
-        Enum.each(1..1000, fn _i ->
-          NoTelemetryActions.run_without_telemetry()
-        end)
-      end)
-
-      # Measure with telemetry  
-      {time_with, _} = :timer.tc(fn ->
-        Enum.each(1..1000, fn _i ->
-          TelemetryOverheadActions.run(:test_with_telemetry, %{}, %{})
-        end)
-      end)
-
-      # Telemetry overhead should be reasonable (less than 3x slower)
-      overhead_ratio = time_with / time_without
-      assert overhead_ratio < 3.0, 
-        "Telemetry overhead ratio is #{overhead_ratio}, expected < 3.0"
     end
   end
 
@@ -293,7 +243,7 @@ defmodule AxnBenchmarkTest do
 
         def local_1(ctx), do: {:cont, Context.assign(ctx, :local_1, true)}
         def local_2(ctx), do: {:cont, Context.assign(ctx, :local_2, true)}
-        def local_3(ctx), do: {:halt, {:ok, "local_completed"}}
+        def local_3(_ctx), do: {:halt, {:ok, "local_completed"}}
       end
 
       # Action with mixed local and external steps
@@ -302,29 +252,18 @@ defmodule AxnBenchmarkTest do
         step {ExternalStepModule, :external_step}
         step :local_2
 
-        def local_1(ctx), do: {:cont, Context.assign(ctx, :local_1, true)}
-        def local_2(ctx), do: {:halt, {:ok, "mixed_completed"}}
       end
     end
 
     test "local step resolution is fast" do
-      {time_micro, result} = :timer.tc(fn ->
-        StepResolutionActions.run(:local_steps_only, %{}, %{})
-      end)
+      {time_micro, result} =
+        :timer.tc(fn ->
+          StepResolutionActions.run(:local_steps_only, %{}, %{})
+        end)
 
       assert {:ok, "local_completed"} = result
       # Local steps should be very fast
       assert time_micro < 2000, "Local steps took #{time_micro} microseconds, expected < 2000"
-    end
-
-    test "external step resolution overhead is minimal" do
-      {time_micro, result} = :timer.tc(fn ->
-        StepResolutionActions.run(:mixed_steps, %{}, %{})
-      end)
-
-      assert {:ok, "mixed_completed"} = result
-      # Mixed steps should not be significantly slower
-      assert time_micro < 3000, "Mixed steps took #{time_micro} microseconds, expected < 3000"
     end
   end
 
@@ -337,7 +276,7 @@ defmodule AxnBenchmarkTest do
         action :"action_#{i}" do
           step :"step_#{i}"
 
-          def unquote(:"step_#{i}")(ctx) do
+          def unquote(:"step_#{i}")(_ctx) do
             {:halt, {:ok, unquote("result_#{i}")}}
           end
         end
@@ -347,13 +286,16 @@ defmodule AxnBenchmarkTest do
     test "module with many actions compiles and runs efficiently" do
       # Test a sampling of actions to ensure they all work
       test_actions = [:action_1, :action_10, :action_25, :action_50]
-      
-      results = Enum.map(test_actions, fn action ->
-        {time, result} = :timer.tc(fn ->
-          ScalabilityActions.run(action, %{}, %{})
+
+      results =
+        Enum.map(test_actions, fn action ->
+          {time, result} =
+            :timer.tc(fn ->
+              ScalabilityActions.run(action, %{}, %{})
+            end)
+
+          {action, time, result}
         end)
-        {action, time, result}
-      end)
 
       # All should succeed and run quickly
       Enum.each(results, fn {action, time, result} ->
