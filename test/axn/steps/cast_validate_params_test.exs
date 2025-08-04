@@ -165,7 +165,7 @@ defmodule Axn.Steps.CastValidateParamsTest do
   end
 
   defp validate_token_not_expired(changeset, _token) do
-    # Mock validation - just pass through for now  
+    # Mock validation - just pass through for now
     changeset
   end
 end
