@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2025-08-04
+
+### Changed
+- **BREAKING**: Validation functions now receive `(changeset, ctx)` instead of `(changeset)`
+- Validation functions can now pattern match on context fields like action name and user data
+- Enhanced validation capabilities with access to full action context
+
+### Added
+- Pattern matching support in validation functions for context-aware validation
+- Access to `ctx.action`, `ctx.assigns`, and other context fields in validation functions
+- Advanced validation examples in documentation showing multi-action pattern matching
+- New tests demonstrating pattern matching on action name, user role, and context fields
+
+### Migration Guide
+- Update validation function signatures from `validate_fn(changeset)` to `validate_fn(changeset, ctx)`
+- Update function references from `&function/1` to `&function/2`
+- Optionally leverage pattern matching on `ctx.action` for different validation rules per action
+
 ## [0.1.0] - 2025-08-04
 
 ### Added
@@ -31,5 +49,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Phoenix Integration**: Seamless integration with both Controllers and LiveViews
 - **Testing Support**: Helper functions and patterns for easy testing
 
-[Unreleased]: https://github.com/guess/axn/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/guess/axn/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/guess/axn/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/guess/axn/commits/v0.1.0
