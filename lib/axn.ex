@@ -129,16 +129,8 @@ defmodule Axn do
               {:halt, result} -> {:halt, %{acc_ctx | result: result}}
             end
           rescue
-            exception ->
-              error =
-                Axn.ErrorHandler.exception_to_error(
-                  exception,
-                  extract_step_name(step),
-                  acc_ctx.action,
-                  acc_ctx
-                )
-
-              {:halt, %{acc_ctx | result: {:error, error}}}
+            _exception ->
+              {:halt, %{acc_ctx | result: {:error, :step_exception}}}
           end
         end)
       end
@@ -151,12 +143,10 @@ defmodule Axn do
           _ ->
             apply_step_function(__MODULE__, step_name, ctx, opts, :step_not_found)
         end
-        |> sanitize_step_result()
       end
 
       defp apply_step({{module, function}, opts}, %Axn.Context{} = ctx) do
         apply_step_function(module, function, ctx, opts, :external_step_not_found)
-        |> sanitize_step_result()
       end
 
       defp apply_step_function(module, function, ctx, opts, error_type) do
@@ -168,19 +158,9 @@ defmodule Axn do
             apply(module, function, [ctx])
 
           true ->
-            {:halt, {:error, %{reason: error_type, module: module, function: function}}}
+            {:halt, {:error, error_type}}
         end
       end
-
-      defp sanitize_step_result({:halt, {:error, error}}) when is_map(error) do
-        sanitized_error = Axn.ErrorHandler.sanitize_error(error)
-        {:halt, {:error, sanitized_error}}
-      end
-
-      defp sanitize_step_result(result), do: result
-
-      defp extract_step_name({step_name, _opts}) when is_atom(step_name), do: step_name
-      defp extract_step_name({{module, function}, _opts}), do: {module, function}
     end
   end
 end

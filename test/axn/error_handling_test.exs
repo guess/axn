@@ -137,8 +137,8 @@ defmodule Axn.ErrorHandlingTest do
     end
   end
 
-  describe "error message handling" do
-    test "errors get safe messages added" do
+  describe "basic error handling" do
+    test "errors are passed through unchanged" do
       defmodule BasicErrorModule do
         use Axn, telemetry_prefix: [:test, :basic_error]
 
@@ -153,35 +153,8 @@ defmodule Axn.ErrorHandlingTest do
 
       {:error, error} = BasicErrorModule.run(:process_payment, %{}, %{})
 
-      # Should have safe message added
       assert error.reason == :validation_failed
-      assert Map.has_key?(error, :safe_message)
-      assert error.safe_message == "Validation failed for provided data"
-    end
-
-    test "database errors get appropriate safe messages" do
-      defmodule DatabaseErrorModule do
-        use Axn, telemetry_prefix: [:test, :db_error]
-
-        action :create_user do
-          step :insert_user
-
-          def insert_user(_ctx) do
-            db_error = %{
-              reason: :database_error,
-              constraint: "users_email_unique_index"
-            }
-
-            {:halt, {:error, db_error}}
-          end
-        end
-      end
-
-      {:error, error} = DatabaseErrorModule.run(:create_user, %{}, %{})
-
-      assert error.reason == :database_error
-      assert Map.has_key?(error, :safe_message)
-      assert error.safe_message =~ "may already exist"
+      assert error.details == "Payment info invalid"
     end
   end
 
@@ -211,11 +184,7 @@ defmodule Axn.ErrorHandlingTest do
 
       {:error, error} = ExceptionHandlingModule.run(:step_raises_exception, %{}, %{})
 
-      assert error.reason == :step_exception
-      assert error.step == :exception_step
-      assert error.exception_type == ArgumentError
-      assert Map.has_key?(error, :safe_message)
-      refute String.contains?(error.safe_message, "Something went wrong in the step")
+      assert error == :step_exception
     end
 
     test "external step exceptions are handled gracefully" do
@@ -245,11 +214,7 @@ defmodule Axn.ErrorHandlingTest do
 
       {:error, error} = WithExternalExceptionModule.run(:external_step_raises, %{}, %{})
 
-      assert error.reason == :step_exception
-      assert error.step == {ExternalExceptionModule, :raising_step}
-      assert error.exception_type == RuntimeError
-      assert Map.has_key?(error, :safe_message)
-      refute String.contains?(inspect(error), "password123")
+      assert error == :step_exception
     end
 
     test "multiple exception types are handled consistently" do
@@ -277,73 +242,13 @@ defmodule Axn.ErrorHandlingTest do
         end
       end
 
-      # Test ArgumentError
-      {:error, error1} = MultipleExceptionTypesModule.run(:argument_error, %{}, %{})
-      assert error1.reason == :step_exception
-      assert error1.exception_type == ArgumentError
-
-      # Test RuntimeError
-      {:error, error2} = MultipleExceptionTypesModule.run(:runtime_error, %{}, %{})
-      assert error2.reason == :step_exception
-      assert error2.exception_type == RuntimeError
-
-      # Test generic error
-      {:error, error3} = MultipleExceptionTypesModule.run(:custom_error, %{}, %{})
-      assert error3.reason == :step_exception
-      assert error3.exception_type == RuntimeError
-
-      # Test system error (File.Error)
-      {:error, error4} = MultipleExceptionTypesModule.run(:system_error, %{}, %{})
-      assert error4.reason == :step_exception
-      assert error4.exception_type == File.Error
+      # All exception types return the same simple error
+      assert {:error, :step_exception} = MultipleExceptionTypesModule.run(:argument_error, %{}, %{})
+      assert {:error, :step_exception} = MultipleExceptionTypesModule.run(:runtime_error, %{}, %{})
+      assert {:error, :step_exception} = MultipleExceptionTypesModule.run(:custom_error, %{}, %{})
+      assert {:error, :step_exception} = MultipleExceptionTypesModule.run(:system_error, %{}, %{})
     end
 
-    test "exception handling preserves action state for logging" do
-      defmodule ExceptionLoggingModule do
-        use Axn, telemetry_prefix: [:test, :exception_logging]
-
-        action :exception_with_context do
-          step :cast_validate_params, schema: %{user_id!: :integer, action!: :string}
-          step :setup_context
-          step :failing_step
-          step :cleanup
-
-          def setup_context(ctx) do
-            {:cont,
-             ctx |> assign(:processing_user, ctx.params.user_id) |> put_private(:step_count, 2)}
-          end
-
-          def failing_step(ctx) do
-            # Include context in exception for debugging
-            user_id = ctx.assigns[:processing_user]
-            raise "Processing failed for user #{user_id} with sensitive token abc123"
-          end
-
-          def cleanup(ctx) do
-            {:cont, put_result(ctx, "cleaned up")}
-          end
-        end
-      end
-
-      {:error, error} =
-        ExceptionLoggingModule.run(:exception_with_context, %{}, %{
-          "user_id" => "42",
-          "action" => "update_profile"
-        })
-
-      # Error should include context for logging
-      assert error.reason == :step_exception
-      assert error.step == :failing_step
-      assert error.action == :exception_with_context
-
-      # Should include sanitized context
-      assert Map.has_key?(error, :context_snapshot)
-      assert error.context_snapshot.params.user_id == 42
-      assert error.context_snapshot.assigns.processing_user == 42
-
-      # But sensitive data should be sanitized
-      refute String.contains?(inspect(error), "abc123")
-    end
 
     test "pipeline continues to work after exceptions in other actions" do
       defmodule PipelineResilienceModule do
@@ -369,7 +274,7 @@ defmodule Axn.ErrorHandlingTest do
       assert {:ok, "success"} = PipelineResilienceModule.run(:working_action, %{}, %{})
 
       # Second action should fail gracefully
-      assert {:error, %{reason: :step_exception}} =
+      assert {:error, :step_exception} =
                PipelineResilienceModule.run(:failing_action, %{}, %{})
 
       # Third action should still work (pipeline not corrupted)

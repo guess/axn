@@ -334,7 +334,6 @@ defmodule Integration.ErrorHandlingIntegrationTest do
       # Error should exist with proper error structure
       assert error.reason == :validation_error
       assert error.field == :credit_card
-      assert Map.has_key?(error, :safe_message)
 
       # Test payment gateway error
       gateway_error_params = %{
@@ -349,7 +348,6 @@ defmodule Integration.ErrorHandlingIntegrationTest do
 
       # Gateway error should have proper structure
       assert error.reason == :payment_gateway_error
-      assert Map.has_key?(error, :safe_message)
     end
 
     test "multi-step action with exception in external service" do
@@ -424,11 +422,8 @@ defmodule Integration.ErrorHandlingIntegrationTest do
 
       {:error, error} = OrderProcessingModule.run(:process_order, %{}, order_params)
 
-      # Should be converted to error tuple (external step not found)
-      assert error.reason == :external_step_not_found
-      # Module is ExternalTaxService (defined in test)
-      assert String.contains?(to_string(error.module), "ExternalTaxService")
-      assert error.function == :calculate_tax
+      # Should be external step not found error
+      assert error == :external_step_not_found
     end
   end
 end

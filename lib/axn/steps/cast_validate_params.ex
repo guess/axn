@@ -23,8 +23,7 @@ defmodule Axn.Steps.CastValidateParams do
         {:cont, new_ctx}
 
       {:error, changeset} ->
-        sanitized_changeset = Axn.ErrorHandler.sanitize_changeset(changeset)
-        {:halt, {:error, %{reason: :invalid_params, changeset: sanitized_changeset}}}
+        {:halt, {:error, %{reason: :invalid_params, changeset: changeset}}}
     end
   end
 
