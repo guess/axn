@@ -4,6 +4,8 @@ defmodule Axn do
   authorization, telemetry, and custom business logic.
   """
 
+  alias Axn.Steps.CastValidateParams
+
   @doc """
   Sets up a module to use the Axn DSL for defining actions.
 
@@ -197,7 +199,7 @@ defmodule Axn do
       defp apply_step({step_name, opts}, %Axn.Context{} = ctx) when is_atom(step_name) do
         case step_name do
           :cast_validate_params ->
-            Axn.Steps.CastValidateParams.cast_validate_params(ctx, opts)
+            CastValidateParams.cast_validate_params(ctx, opts)
 
           _ ->
             apply_step_function(__MODULE__, step_name, ctx, opts)
