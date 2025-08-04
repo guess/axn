@@ -251,11 +251,12 @@ defmodule Axn.ErrorHandlingTest do
       assert {:error, %{reason: :step_exception, message: "Runtime failure"}} =
                MultipleExceptionTypesModule.run(:runtime_error, %{}, %{})
 
-      assert {:error, %{reason: :step_exception, message: "Custom error message"}} = 
+      assert {:error, %{reason: :step_exception, message: "Custom error message"}} =
                MultipleExceptionTypesModule.run(:custom_error, %{}, %{})
-      
-      assert {:error, %{reason: :step_exception, message: error_msg}} = 
+
+      assert {:error, %{reason: :step_exception, message: error_msg}} =
                MultipleExceptionTypesModule.run(:system_error, %{}, %{})
+
       assert String.contains?(error_msg, "no such file or directory")
     end
 

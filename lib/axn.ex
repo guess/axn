@@ -130,7 +130,11 @@ defmodule Axn do
         rescue
           exception ->
             # Preserve exception information for debugging
-            %{ctx | result: {:error, %{reason: :step_exception, message: Exception.message(exception)}}}
+            %{
+              ctx
+              | result:
+                  {:error, %{reason: :step_exception, message: Exception.message(exception)}}
+            }
         end
       end
 
@@ -142,7 +146,10 @@ defmodule Axn do
         }
       end
 
-      defp get_user_id(%Axn.Context{assigns: %{current_user: %{id: id}}}) when is_binary(id) or is_integer(id), do: to_string(id)
+      defp get_user_id(%Axn.Context{assigns: %{current_user: %{id: id}}})
+           when is_binary(id) or is_integer(id),
+           do: to_string(id)
+
       defp get_user_id(_), do: nil
 
       defp find_action(action_name) do

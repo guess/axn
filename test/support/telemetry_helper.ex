@@ -78,7 +78,13 @@ defmodule Axn.TelemetryHelper do
       [:test_app, :actions, :exception],
       [:custom, :prefix, :start],
       [:custom, :prefix, :stop],
-      [:custom, :prefix, :exception]
+      [:custom, :prefix, :exception],
+      [:my_app, :users, :start],
+      [:my_app, :users, :stop],
+      [:my_app, :users, :exception],
+      [:my_app, :payments, :start],
+      [:my_app, :payments, :stop],
+      [:my_app, :payments, :exception]
     ]
   end
 
