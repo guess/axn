@@ -94,12 +94,12 @@ defmodule AxnIntegrationTest do
           region: [field: :string, default: "US"],
           challenge_token!: :string
         },
-        validate: &__MODULE__.validate_phone_and_token/1
+        validate: &__MODULE__.validate_phone_and_token/2
 
       step :require_authenticated_user
       step :handle_request
 
-      def validate_phone_and_token(changeset) do
+      def validate_phone_and_token(changeset, _ctx) do
         phone = Ecto.Changeset.get_field(changeset, :phone)
 
         if phone && String.starts_with?(phone, "+") do

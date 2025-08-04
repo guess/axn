@@ -37,9 +37,17 @@ defmodule Axn do
         use Axn
 
         action :create_user do
-          step :cast_validate_params, schema: %{email!: :string, name!: :string}
+          step :cast_validate_params, 
+               schema: %{email!: :string, name!: :string},
+               validate: &__MODULE__.validate_params/2
           step :require_admin
           step :handle_create
+        end
+
+        def validate_params(changeset, %{action: :create_user} = ctx) do
+          changeset
+          |> validate_format(:email, ~r/@/)
+          |> validate_admin_permissions(ctx.assigns.current_user)
         end
 
         def require_admin(ctx) do
@@ -58,6 +66,44 @@ defmodule Axn do
         end
 
         defp admin?(user), do: user && user.role == "admin"
+      end
+
+  ## Advanced Validation Example
+
+  Use pattern matching with context to handle multiple actions in a single validation function:
+
+      defmodule MyApp.AuthActions do
+        use Axn
+
+        action :request_otp do
+          step :cast_validate_params, 
+               schema: %{phone!: :string, region: [field: :string, default: "US"]},
+               validate: &__MODULE__.validate_params/2
+          step :handle_request
+        end
+
+        action :verify_otp do
+          step :cast_validate_params,
+               schema: %{phone!: :string, code!: :string},
+               validate: &__MODULE__.validate_params/2
+          step :handle_verify
+        end
+
+        # Single validation function handling multiple actions
+        def validate_params(changeset, %{action: :request_otp} = ctx) do
+          params = Ecto.Changeset.apply_changes(changeset)
+          
+          changeset
+          |> validate_phone_number(:phone, region: params.region)
+          |> validate_user_permissions(ctx.assigns.current_user)
+        end
+
+        def validate_params(changeset, %{action: :verify_otp} = ctx) do
+          changeset
+          |> validate_phone_number(:phone, region: "US")
+          |> validate_otp_format(:code)
+          |> validate_rate_limit(ctx.assigns.current_user)
+        end
       end
 
   ## Usage in Phoenix

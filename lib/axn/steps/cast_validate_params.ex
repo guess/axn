@@ -8,7 +8,7 @@ defmodule Axn.Steps.CastValidateParams do
 
   import Axn.Context
 
-  @type validate_fun :: (Ecto.Changeset.t() -> Ecto.Changeset.t())
+  @type validate_fun :: (Ecto.Changeset.t(), Axn.Context.t() -> Ecto.Changeset.t())
 
   @doc """
   Casts and validates parameters according to a schema with optional custom validation.
@@ -35,14 +35,15 @@ defmodule Axn.Steps.CastValidateParams do
 
   ## Custom Validation
 
-  The optional `:validate` function receives an `Ecto.Changeset` after initial casting
-  and validation. It should return a modified changeset with any additional validations
-  applied:
+  The optional `:validate` function receives an `Ecto.Changeset` and the current `Axn.Context`
+  after initial casting and validation. It should return a modified changeset with any 
+  additional validations applied:
 
-      validate_fn = fn changeset ->
+      def validate_params(changeset, ctx) do
         changeset
         |> validate_format(:email, ~r/@/)
         |> validate_length(:name, min: 2)
+        |> validate_user_permissions(ctx.assigns.current_user)
       end
 
   ## Context Updates
@@ -64,9 +65,9 @@ defmodule Axn.Steps.CastValidateParams do
       # With custom validation
       step :cast_validate_params,
            schema: %{phone!: :string, region: [field: :string, default: "US"]},
-           validate: &validate_phone_number/1
+           validate: &__MODULE__.validate_phone_number/2
 
-      defp validate_phone_number(changeset) do
+      def validate_phone_number(changeset, ctx) do
         params = Params.to_map(changeset)
         validate_format(changeset, :phone, phone_regex_for_region(params.region))
       end
@@ -87,7 +88,7 @@ defmodule Axn.Steps.CastValidateParams do
     raw_params = ctx.params
     changeset = handle_cast_params(raw_params, schema)
 
-    case handle_validate_params(changeset, validate_fn) do
+    case handle_validate_params(changeset, validate_fn, ctx) do
       {:ok, params, changeset} ->
         new_ctx =
           ctx
@@ -113,11 +114,11 @@ defmodule Axn.Steps.CastValidateParams do
     dynamic_module.from(raw_params)
   end
 
-  @spec handle_validate_params(Ecto.Changeset.t(), validate_fun() | nil) ::
+  @spec handle_validate_params(Ecto.Changeset.t(), validate_fun() | nil, Axn.Context.t()) ::
           {:ok, map(), Ecto.Changeset.t()} | {:error, Ecto.Changeset.t()}
-  defp handle_validate_params(changeset, validate_fn) do
+  defp handle_validate_params(changeset, validate_fn, ctx) do
     changeset
-    |> apply_validate_fun(validate_fn)
+    |> apply_validate_fun(validate_fn, ctx)
     |> case do
       %{valid?: true} = changeset ->
         params = Params.to_map(changeset)
@@ -128,12 +129,12 @@ defmodule Axn.Steps.CastValidateParams do
     end
   end
 
-  @spec apply_validate_fun(Ecto.Changeset.t(), validate_fun() | nil) :: Ecto.Changeset.t()
-  defp apply_validate_fun(changeset, validate_fn) when is_function(validate_fn) do
-    validate_fn.(changeset)
+  @spec apply_validate_fun(Ecto.Changeset.t(), validate_fun() | nil, Axn.Context.t()) :: Ecto.Changeset.t()
+  defp apply_validate_fun(changeset, validate_fn, ctx) when is_function(validate_fn) do
+    validate_fn.(changeset, ctx)
   end
 
-  defp apply_validate_fun(changeset, _validate_fn) do
+  defp apply_validate_fun(changeset, _validate_fn, _ctx) do
     changeset
   end
 
