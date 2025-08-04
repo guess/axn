@@ -13,13 +13,13 @@ defmodule Axn.TestHelpers do
       defmodule MyApp.UserActionsTest do
         use ExUnit.Case
         import Axn.TestHelpers
-        
+
         test "my step works correctly" do
           ctx = build_context(
             params: %{email: "test@example.com"},
             assigns: %{current_user: build_user()}
           )
-          
+
           assert {:cont, updated_ctx} = MyStep.validate_email(ctx)
           assert updated_ctx.assigns.email_valid == true
         end
@@ -46,13 +46,13 @@ defmodule Axn.TestHelpers do
 
       # Basic context
       ctx = build_context()
-      
+
       # With params and user
       ctx = build_context(
-        params: %{email: "test@example.com"}, 
+        params: %{email: "test@example.com"},
         assigns: %{current_user: %{id: 123}}
       )
-      
+
       # With raw params different from cast params
       ctx = build_context(
         params: %{age: 25},
@@ -114,7 +114,7 @@ defmodule Axn.TestHelpers do
 
       # Valid changeset
       changeset = build_changeset(%{email: "test@example.com"})
-      
+
       # Invalid changeset with errors
       changeset = build_changeset(%{}, [email: "can't be blank"])
   """
@@ -139,9 +139,9 @@ defmodule Axn.TestHelpers do
 
       test "action emits telemetry" do
         events = capture_telemetry([:my_app, :users])
-        
+
         MyActions.run(:create_user, %{}, %{})
-        
+
         captured_events = events.()
         assert length(captured_events) == 2  # start and stop
       end
@@ -216,7 +216,7 @@ defmodule Axn.TestHelpers do
         assert user.id
         assert user.email == "test@example.com"
       end)
-      
+
       assert_step_halts(result, {:error, :unauthorized})
   """
   def assert_step_halts(step_result, expected_result, assertion_fn \\ nil)
@@ -264,7 +264,7 @@ defmodule Axn.TestHelpers do
   ## Examples
 
       assert_action_fails(MyActions.run(:create_user, assigns, params), :unauthorized)
-      
+
       assert_action_fails(
         MyActions.run(:create_user, assigns, params),
         %{reason: :invalid_params},
@@ -296,13 +296,13 @@ defmodule Axn.TestHelpers do
   ## Examples
 
       # Step that always continues
-      step_fn = mock_step(:cont, fn ctx -> 
-        Context.assign(ctx, :processed, true) 
+      step_fn = mock_step(:cont, fn ctx ->
+        Context.assign(ctx, :processed, true)
       end)
-      
+
       # Step that halts with success
       step_fn = mock_step(:halt, {:ok, %{result: "success"}})
-      
+
       # Step that halts with error
       step_fn = mock_step(:halt, {:error, :validation_failed})
   """
@@ -332,15 +332,15 @@ defmodule Axn.TestHelpers do
         {:my_custom_step, []},
         {:finalize, []}
       ]
-      
+
       ctx = build_context(raw_params: %{"email" => "test@example.com"})
       final_ctx = run_step_pipeline(steps, ctx, MyModule)
-      
+
       assert final_ctx.result == {:ok, "success"}
   """
   def run_step_pipeline(steps, initial_ctx, module) do
     Enum.reduce_while(steps, initial_ctx, fn {step_name, opts}, ctx ->
-      case apply(module, :apply_step, [step_name, ctx, opts]) do
+      case module.apply_step(step_name, ctx, opts) do
         {:cont, new_ctx} -> {:cont, new_ctx}
         {:halt, result} -> {:halt, Context.put_result(ctx, result)}
       end
