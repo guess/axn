@@ -6,12 +6,14 @@ defmodule AxnIntegrationTest do
   with real-world scenarios.
   """
   use ExUnit.Case, async: true
+
   alias Axn.Context
 
   @moduletag :integration
 
   # Example application module
   defmodule TestUserActions do
+    @moduledoc false
     use Axn, telemetry_prefix: [:test_app, :users]
 
     action :create_user do
@@ -29,7 +31,7 @@ defmodule AxnIntegrationTest do
 
       def handle_create(ctx) do
         user = %{
-          id: :rand.uniform(10000),
+          id: :rand.uniform(10_000),
           email: ctx.params.email,
           name: ctx.params.name,
           created_at: DateTime.utc_now()
@@ -82,6 +84,7 @@ defmodule AxnIntegrationTest do
 
   # Example with custom validation
   defmodule TestAuthActions do
+    @moduledoc false
     use Axn, telemetry_prefix: [:test_app, :auth]
 
     action :request_otp do
@@ -119,7 +122,7 @@ defmodule AxnIntegrationTest do
         otp_data = %{
           phone: ctx.params.phone,
           region: ctx.params.region,
-          otp_code: :rand.uniform(999_999) |> Integer.to_string() |> String.pad_leading(6, "0"),
+          otp_code: 999_999 |> :rand.uniform() |> Integer.to_string() |> String.pad_leading(6, "0"),
           expires_at: DateTime.add(DateTime.utc_now(), 300, :second)
         }
 
@@ -264,6 +267,7 @@ defmodule AxnIntegrationTest do
 
     test "step exceptions are caught and returned as errors" do
       defmodule FailingActions do
+        @moduledoc false
         use Axn
 
         action :failing_action do

@@ -1,9 +1,11 @@
 defmodule Axn.TelemetryTest do
   use ExUnit.Case
+
   alias Axn.TelemetryHelper
 
   # Test helper module for telemetry testing
   defmodule TestActions do
+    @moduledoc false
     use Axn, telemetry_prefix: [:test_app, :actions]
 
     action :successful_action do
@@ -33,6 +35,7 @@ defmodule Axn.TelemetryTest do
 
   # Test helper module with custom telemetry prefix
   defmodule CustomTelemetryActions do
+    @moduledoc false
     use Axn, telemetry_prefix: [:custom, :prefix]
 
     action :custom_action do
@@ -46,6 +49,7 @@ defmodule Axn.TelemetryTest do
 
   # Test helper module without telemetry prefix (should use default)
   defmodule DefaultTelemetryActions do
+    @moduledoc false
     use Axn
 
     action :default_action do
@@ -160,7 +164,7 @@ defmodule Axn.TelemetryTest do
 
       # Only these safe fields should be present (plus telemetry internal fields)
       expected_keys = [:action, :result_type, :user_id, :telemetry_span_context]
-      actual_keys = Map.keys(metadata) |> Enum.sort()
+      actual_keys = metadata |> Map.keys() |> Enum.sort()
       assert actual_keys == Enum.sort(expected_keys)
 
       # Verify safe values

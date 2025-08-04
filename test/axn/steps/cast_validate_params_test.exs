@@ -1,13 +1,15 @@
 defmodule Axn.Steps.CastValidateParamsTest do
   use ExUnit.Case
 
+  alias Axn.Steps.CastValidateParams
+
   describe "cast_validate_params/2" do
     test "successfully casts valid params with basic schema" do
       raw_params = %{"name" => "John", "age" => "25"}
       ctx = %Axn.Context{params: raw_params}
       opts = [schema: %{name!: :string, age: :integer}]
 
-      assert {:cont, updated_ctx} = Axn.Steps.CastValidateParams.cast_validate_params(ctx, opts)
+      assert {:cont, updated_ctx} = CastValidateParams.cast_validate_params(ctx, opts)
       assert updated_ctx.params == %{name: "John", age: 25}
       # Raw params preserved in private
       assert updated_ctx.private.raw_params == raw_params
@@ -19,7 +21,7 @@ defmodule Axn.Steps.CastValidateParamsTest do
       ctx = %Axn.Context{params: raw_params}
       opts = [schema: %{name!: :string, age: :integer}]
 
-      assert {:cont, updated_ctx} = Axn.Steps.CastValidateParams.cast_validate_params(ctx, opts)
+      assert {:cont, updated_ctx} = CastValidateParams.cast_validate_params(ctx, opts)
       assert updated_ctx.params == %{name: "John"}
       assert updated_ctx.private.changeset.valid?
     end
@@ -29,7 +31,7 @@ defmodule Axn.Steps.CastValidateParamsTest do
       ctx = %Axn.Context{params: raw_params}
       opts = [schema: %{name!: :string, region: [field: :string, default: "US"]}]
 
-      assert {:cont, updated_ctx} = Axn.Steps.CastValidateParams.cast_validate_params(ctx, opts)
+      assert {:cont, updated_ctx} = CastValidateParams.cast_validate_params(ctx, opts)
       assert updated_ctx.params == %{name: "John", region: "US"}
       assert updated_ctx.private.changeset.valid?
     end
@@ -45,7 +47,7 @@ defmodule Axn.Steps.CastValidateParamsTest do
 
       opts = [schema: %{phone!: :string, region: :string}, validate: validate_fn]
 
-      assert {:cont, updated_ctx} = Axn.Steps.CastValidateParams.cast_validate_params(ctx, opts)
+      assert {:cont, updated_ctx} = CastValidateParams.cast_validate_params(ctx, opts)
       assert updated_ctx.params == %{phone: "+1234567890", region: "US"}
       assert updated_ctx.private.changeset.valid?
     end
@@ -56,7 +58,7 @@ defmodule Axn.Steps.CastValidateParamsTest do
       opts = [schema: %{name!: :string, age: :integer}]
 
       assert {:halt, {:error, %{reason: :invalid_params, changeset: changeset}}} =
-               Axn.Steps.CastValidateParams.cast_validate_params(ctx, opts)
+               CastValidateParams.cast_validate_params(ctx, opts)
 
       refute changeset.valid?
       assert changeset.errors[:name] == {"can't be blank", [validation: :required]}
@@ -68,7 +70,7 @@ defmodule Axn.Steps.CastValidateParamsTest do
       opts = [schema: %{name!: :string, age!: :integer}]
 
       assert {:halt, {:error, %{reason: :invalid_params, changeset: changeset}}} =
-               Axn.Steps.CastValidateParams.cast_validate_params(ctx, opts)
+               CastValidateParams.cast_validate_params(ctx, opts)
 
       refute changeset.valid?
       assert changeset.errors[:age] == {"is invalid", [type: :integer, validation: :cast]}
@@ -86,7 +88,7 @@ defmodule Axn.Steps.CastValidateParamsTest do
       opts = [schema: %{phone!: :string, region: :string}, validate: validate_fn]
 
       assert {:halt, {:error, %{reason: :invalid_params, changeset: changeset}}} =
-               Axn.Steps.CastValidateParams.cast_validate_params(ctx, opts)
+               CastValidateParams.cast_validate_params(ctx, opts)
 
       refute changeset.valid?
       assert changeset.errors[:phone] == {"invalid phone format", []}
@@ -114,7 +116,7 @@ defmodule Axn.Steps.CastValidateParamsTest do
       ]
 
       # This should pass with our mock validation
-      assert {:cont, updated_ctx} = Axn.Steps.CastValidateParams.cast_validate_params(ctx, opts)
+      assert {:cont, updated_ctx} = CastValidateParams.cast_validate_params(ctx, opts)
       assert updated_ctx.params.phone == "+1234567890"
       assert updated_ctx.params.region == "US"
       assert updated_ctx.params.challenge_token == "abc123"
@@ -129,7 +131,7 @@ defmodule Axn.Steps.CastValidateParamsTest do
 
       opts = [schema: %{tags: [field: {:array, :string}]}]
 
-      assert {:cont, updated_ctx} = Axn.Steps.CastValidateParams.cast_validate_params(ctx, opts)
+      assert {:cont, updated_ctx} = CastValidateParams.cast_validate_params(ctx, opts)
       assert updated_ctx.params == %{tags: ["elixir", "phoenix", "web"]}
       assert updated_ctx.private.changeset.valid?
     end
@@ -141,7 +143,7 @@ defmodule Axn.Steps.CastValidateParamsTest do
       opts = []
 
       assert_raise KeyError, fn ->
-        Axn.Steps.CastValidateParams.cast_validate_params(ctx, opts)
+        CastValidateParams.cast_validate_params(ctx, opts)
       end
     end
 
@@ -150,7 +152,7 @@ defmodule Axn.Steps.CastValidateParamsTest do
       ctx = %Axn.Context{params: raw_params}
       opts = [schema: %{name: :string, age: :integer}]
 
-      assert {:cont, updated_ctx} = Axn.Steps.CastValidateParams.cast_validate_params(ctx, opts)
+      assert {:cont, updated_ctx} = CastValidateParams.cast_validate_params(ctx, opts)
       assert updated_ctx.params == %{}
       assert updated_ctx.private.changeset.valid?
     end

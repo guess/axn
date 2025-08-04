@@ -27,6 +27,7 @@ defmodule Axn.TestHelpers do
   """
 
   import ExUnit.Assertions
+
   alias Axn.Context
 
   @doc """
@@ -92,7 +93,7 @@ defmodule Axn.TestHelpers do
       specific_user = build_user(id: 123, email: "admin@example.com")
   """
   def build_user(opts \\ []) do
-    id = Keyword.get(opts, :id, :rand.uniform(10000))
+    id = Keyword.get(opts, :id, :rand.uniform(10_000))
     role = Keyword.get(opts, :role, "user")
     email = Keyword.get(opts, :email, "test@example.com")
 
@@ -120,9 +121,7 @@ defmodule Axn.TestHelpers do
   def build_changeset(params, errors \\ []) do
     types = %{email: :string, name: :string, age: :integer}
 
-    changeset =
-      {%{}, types}
-      |> Ecto.Changeset.cast(params, Map.keys(types))
+    changeset = Ecto.Changeset.cast({%{}, types}, params, Map.keys(types))
 
     # Add errors if provided
     Enum.reduce(errors, changeset, fn {field, message}, acc ->
@@ -149,7 +148,7 @@ defmodule Axn.TestHelpers do
   """
   def capture_telemetry(event_prefixes) when is_list(event_prefixes) do
     test_pid = self()
-    handler_id = "test-#{:rand.uniform(10000)}"
+    handler_id = "test-#{:rand.uniform(10_000)}"
 
     # Create all event patterns (start/stop for each prefix)
     events =

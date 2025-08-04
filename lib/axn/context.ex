@@ -62,7 +62,7 @@ defmodule Axn.Context do
   end
 
   def assign(%__MODULE__{} = ctx, assigns) when is_list(assigns) do
-    assign(ctx, Enum.into(assigns, %{}))
+    assign(ctx, Map.new(assigns))
   end
 
   @doc """
