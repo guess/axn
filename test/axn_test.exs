@@ -208,7 +208,7 @@ defmodule AxnTest do
       # Test context flow and data access
       raw_params = %{"name" => "John"}
       assigns = %{user_id: 123}
-      {:ok, result} = PipelineTestModule.run(:context_flow, assigns, raw_params)
+      {:ok, result} = PipelineTestModule.run(:context_flow, raw_params, assigns)
 
       assert result.message == "processed"
       assert result.input_data.raw_params == raw_params

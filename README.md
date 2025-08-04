@@ -1,18 +1,21 @@
-# Axn - Action DSL for Elixir
+# Axn - Unified Action DSL for Phoenix
 
-A clean, step-based DSL library for defining actions with parameter validation, authorization, telemetry, and custom business logic. Axn prioritizes simplicity, explicitness, and ease of following execution flow.
+A clean, step-based DSL library for defining actions that work seamlessly across Phoenix Controllers and LiveViews. Axn provides a unified interface for parameter validation, authorization, telemetry, and business logic where Plugs cannot be used.
+
+**Why Axn?** Plugs only work with `Plug.Conn` but not `Phoenix.LiveView.Socket`. Axn bridges this gap, letting you write action logic once and use it in both contexts.
 
 [![Hex.pm](https://img.shields.io/hexpm/v/axn.svg)](https://hex.pm/packages/axn)
 [![Documentation](https://img.shields.io/badge/docs-hexdocs-blue.svg)](https://hexdocs.pm/axn)
 
 ## Features
 
+- **Unified Phoenix Integration**: Same action logic works in Controllers and LiveViews
+- **Beyond Plugs**: Works where Plugs cannot - with LiveView Sockets
 - **Explicit over implicit**: Each action clearly shows its execution flow
 - **Composable**: Steps are reusable across actions and modules
 - **Safe by default**: Telemetry and error handling don't leak sensitive data
 - **Simple to implement**: Minimal macro magic, straightforward execution model
 - **Easy to test**: Steps are pure functions that are easy to unit test
-- **Familiar patterns**: Feels natural to Elixir developers
 
 ## Installation
 
@@ -61,7 +64,7 @@ defmodule MyAppWeb.UserController do
   use MyAppWeb, :controller
 
   def create(conn, params) do
-    case MyApp.UserActions.run(:create_user, conn.assigns, params) do
+    case MyApp.UserActions.run(:create_user, params, conn) do
       {:ok, user} ->
         json(conn, %{success: true, user: user})
       {:error, %{reason: :invalid_params, changeset: changeset}} ->
@@ -392,7 +395,7 @@ defmodule MyApp.UserActionsTest do
     params = %{"email" => "test@example.com", "name" => "John Doe"}
 
     assert_action_succeeds(
-      MyApp.UserActions.run(:create_user, assigns, params),
+      MyApp.UserActions.run(:create_user, params, assigns),
       fn user ->
         assert user.email == "test@example.com"
         assert user.name == "John Doe"
@@ -405,7 +408,7 @@ defmodule MyApp.UserActionsTest do
     params = %{"email" => "test@example.com", "name" => "John Doe"}
 
     assert_action_fails(
-      MyApp.UserActions.run(:create_user, assigns, params),
+      MyApp.UserActions.run(:create_user, params, assigns),
       :unauthorized
     )
   end
@@ -465,27 +468,105 @@ Axn is designed for high performance:
 - Context mutations don't accumulate large data structures
 - Steps can be tested independently for performance
 
-## Phoenix Integration
+## Unified Phoenix Integration
 
-Axn works seamlessly with Phoenix:
+**The Problem:** Plugs work great for Phoenix Controllers (with `Plug.Conn`) but cannot be used with Phoenix LiveViews (with `Phoenix.LiveView.Socket`). This creates code duplication when you need the same authorization, rate limiting, data loading, or business logic in both contexts.
+
+**The Solution:** Axn provides a unified action interface that works seamlessly with both Controllers and LiveViews, eliminating the need to duplicate logic across these different Phoenix contexts.
+
+### Unified API
+
+Axn actions use a consistent interface that works across Phoenix contexts:
 
 ```elixir
-# In controllers
+MyApp.UserActions.run(action, params, source)
+```
+
+The `source` parameter provides context and can be:
+- **Phoenix Controller**: Pass the full `conn` 
+- **Phoenix LiveView**: Pass the full `socket`
+- **Direct calls/tests**: Pass a plain assigns map
+
+Axn automatically extracts assigns from the source while preserving access to the original context.
+
+### Example: Unified User Creation
+
+Define the action once:
+
+```elixir
+defmodule MyApp.UserActions do
+  use Axn
+
+  action :create_user do
+    step :cast_validate_params, schema: %{email!: :string, name!: :string}
+    step :require_admin
+    step :create_user_record
+    step :send_welcome_email
+
+    def require_admin(ctx) do
+      if admin?(ctx.assigns.current_user) do
+        {:cont, ctx}
+      else
+        {:halt, {:error, :unauthorized}}
+      end
+    end
+
+    def create_user_record(ctx) do
+      case Users.create(ctx.params) do
+        {:ok, user} -> {:cont, assign(ctx, :user, user)}
+        {:error, changeset} -> {:halt, {:error, changeset}}
+      end
+    end
+
+    def send_welcome_email(ctx) do
+      # Access original source for context-specific behavior
+      source = get_private(ctx, :source)
+      
+      case source do
+        %Plug.Conn{} -> 
+          # API - send email async
+          WelcomeEmail.send_async(ctx.assigns.user)
+        %Phoenix.LiveView.Socket{} ->
+          # LiveView - send email and show flash
+          WelcomeEmail.send_async(ctx.assigns.user)
+      end
+      
+      {:halt, {:ok, ctx.assigns.user}}
+    end
+  end
+end
+```
+
+Use in Phoenix Controller:
+
+```elixir
 def create(conn, params) do
-  case MyActions.run(:create_user, conn.assigns, params) do
+  case MyApp.UserActions.run(:create_user, params, conn) do
     {:ok, user} -> json(conn, %{user: user})
     {:error, reason} -> json(conn, %{error: reason})
   end
 end
+```
 
-# In LiveViews
-def handle_event("submit", params, socket) do
-  case MyActions.run(:submit_form, socket.assigns, params) do
-    {:ok, result} -> {:noreply, put_flash(socket, :info, "Success!")}
-    {:error, reason} -> {:noreply, put_flash(socket, :error, "Error: #{reason}")}
+Use in Phoenix LiveView:
+
+```elixir
+def handle_event("create_user", params, socket) do
+  case MyApp.UserActions.run(:create_user, params, socket) do
+    {:ok, user} -> 
+      {:noreply, socket |> put_flash(:info, "User created!") |> assign(:user, user)}
+    {:error, reason} -> 
+      {:noreply, put_flash(socket, :error, "Failed: #{reason}")}
   end
 end
 ```
+
+**Key Benefits:**
+- Same authorization logic (`require_admin`) works in both contexts
+- Same validation logic works in both contexts  
+- Same business logic works in both contexts
+- Context-specific behavior when needed (email handling)
+- No code duplication between Controller and LiveView
 
 ## Advanced Usage
 
@@ -556,20 +637,25 @@ end
 
 ## Comparison with Other Libraries
 
+### vs. Phoenix Plugs
+
+- **Plugs**: Work only with `Plug.Conn` (Controllers), great for HTTP-specific logic
+- **Axn**: Works with both `Plug.Conn` and `Phoenix.LiveView.Socket`, unified business logic
+
+### vs. Phoenix Contexts
+
+- **Contexts**: Business logic modules, but require manual integration in Controllers/LiveViews  
+- **Axn**: Built-in integration patterns with automatic parameter validation, authorization, and telemetry
+
 ### vs. Commanded/EventStore
 
-- **Axn**: Simple request/response actions with telemetry
+- **Axn**: Simple request/response actions with unified Phoenix integration
 - **Commanded**: Full CQRS/Event Sourcing with complex state management
 
 ### vs. Sage
 
-- **Axn**: Step-based actions with built-in telemetry and parameter validation
+- **Axn**: Step-based actions optimized for Phoenix Controller/LiveView unification  
 - **Sage**: Transaction-like operations with compensation
-
-### vs. Raw Phoenix Controllers
-
-- **Axn**: Structured, testable, reusable action logic with automatic telemetry
-- **Phoenix**: Direct controller actions with manual error handling
 
 ## Contributing
 

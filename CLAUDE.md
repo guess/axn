@@ -426,7 +426,7 @@ defmodule MyActionsTest do
     params = %{"phone" => "+1234567890", "challenge_token" => "abc123"}
 
     # Test using run/3 for simple result checking
-    assert {:ok, %{message: "OTP sent"}} = MyActions.run(:request_otp, assigns, params)
+    assert {:ok, %{message: "OTP sent"}} = MyActions.run(:request_otp, params, assigns)
   end
 
   test "request_otp action returns full context" do
@@ -434,7 +434,7 @@ defmodule MyActionsTest do
     params = %{"phone" => "+1234567890", "challenge_token" => "abc123"}
 
     # With simplified API, just test the result
-    assert {:ok, %{message: "OTP sent"}} = MyActions.run(:request_otp, assigns, params)
+    assert {:ok, %{message: "OTP sent"}} = MyActions.run(:request_otp, params, assigns)
   end
 
   test "request_otp action fails authorization" do
@@ -442,7 +442,7 @@ defmodule MyActionsTest do
     params = %{"phone" => "+1234567890", "challenge_token" => "abc123"}
 
     # Test failure using run/3
-    assert {:error, :unauthorized} = MyActions.run(:request_otp, assigns, params)
+    assert {:error, :unauthorized} = MyActions.run(:request_otp, params, assigns)
   end
 end
 ```
@@ -545,7 +545,7 @@ defmodule MyAppWeb.UserController do
   use MyAppWeb, :controller
 
   def create(conn, params) do
-    case MyApp.UserActions.run(:create_user, conn.assigns, params) do
+    case MyApp.UserActions.run(:create_user, params, conn.assigns) do
       {:ok, user} ->
         json(conn, %{success: true, user: user})
       {:error, %{reason: :invalid_params, changeset: changeset}} ->
@@ -751,12 +751,21 @@ end
 ### Entry Point
 ```elixir
 # Primary function - returns result tuple
-MyActionModule.run(action_name, assigns, raw_params) ->
+MyActionModule.run(action, params, source) ->
   {:ok, result} | {:error, reason}
 
+# The source parameter provides context and can be:
+# - A plain map (treated as assigns directly)
+# - Phoenix.LiveView.Socket (assigns extracted from socket.assigns)
+# - Plug.Conn (assigns extracted from conn.assigns)
+# - Any struct/map with assigns field (assigns are automatically extracted)
+
+# This unified interface allows the same action logic to work across
+# Phoenix Controllers and LiveViews where Plugs cannot be used
+
 # The run/3 function processes the result from the internal action pipeline:
-def run(action_name, assigns, raw_params) do
-  ctx = run_action_pipeline(action_name, assigns, raw_params)
+def run(action, params, source) do
+  ctx = run_action_pipeline(action, params, source)
 
   case ctx.result do
     {:ok, value} -> {:ok, value}
@@ -768,9 +777,9 @@ end
 
 ### Integration Points
 ```elixir
-# Phoenix Controller - Simple case (just need result)
+# Phoenix Controller - pass full conn for richer context
 def create(conn, params) do
-  case MyApp.UserActions.run(:create_user, conn.assigns, params) do
+  case MyApp.UserActions.run(:create_user, params, conn) do
     {:ok, user} -> json(conn, %{success: true, user: user})
     {:error, %{reason: :invalid_params, changeset: changeset}} ->
       json(conn, %{errors: format_changeset_errors(changeset)})
@@ -779,21 +788,29 @@ def create(conn, params) do
   end
 end
 
-# Phoenix Controller - All cases use the same simple API
-def create(conn, params) do
-  case MyApp.UserActions.run(:create_user, conn.assigns, params) do
-    {:ok, user} -> json(conn, %{success: true, user: user})
-    {:error, %{reason: :invalid_params, changeset: changeset}} ->
-      json(conn, %{errors: format_changeset_errors(changeset)})
-    {:error, reason} -> json(conn, %{error: reason})
+# LiveView - pass full socket for richer context
+def handle_event("submit", params, socket) do
+  case MyApp.FormActions.run(:submit_form, params, socket) do
+    {:ok, result} -> {:noreply, put_flash(socket, :info, "Success!")}
+    {:error, reason} -> {:noreply, put_flash(socket, :error, "Error: #{reason}")}
   end
 end
 
-# LiveView - Simple case
-def handle_event("submit", params, socket) do
-  case MyApp.FormActions.run(:submit_form, socket.assigns, params) do
-    {:ok, result} -> {:noreply, put_flash(socket, :info, "Success!")}
-    {:error, reason} -> {:noreply, put_flash(socket, :error, "Error: #{reason}")}
+# Access original source in action steps
+def my_custom_step(ctx) do
+  source = get_private(ctx, :source)
+  
+  # Different behavior based on source type
+  case source do
+    %Plug.Conn{} -> 
+      # Handle API request
+      {:cont, assign(ctx, :request_type, :api)}
+    %Phoenix.LiveView.Socket{} ->
+      # Handle LiveView event
+      {:cont, assign(ctx, :request_type, :liveview)}
+    _assigns_map ->
+      # Handle direct calls
+      {:cont, assign(ctx, :request_type, :direct)}
   end
 end
 ```

@@ -149,7 +149,7 @@ defmodule Axn.TelemetryTest do
 
     test "merges module-level metadata with defaults" do
       assigns = %{current_user: %{id: "user_123"}}
-      ModuleMetadataActions.run(:test_action, assigns, %{})
+      ModuleMetadataActions.run(:test_action, %{}, assigns)
 
       # Skip start event, get stop event
       {:ok, {_start_event, _start_measurements, _start_metadata}} =
@@ -201,7 +201,7 @@ defmodule Axn.TelemetryTest do
 
       params = %{"password" => "user_password", "credit_card" => "4111111111111111"}
 
-      ModuleMetadataActions.run(:test_action, assigns, params)
+      ModuleMetadataActions.run(:test_action, params, assigns)
 
       # Skip start event, get stop event with final metadata
       {:ok, {_start_event, _start_measurements, _start_metadata}} =

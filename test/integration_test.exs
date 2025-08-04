@@ -136,7 +136,7 @@ defmodule AxnIntegrationTest do
       assigns = %{current_user: %{id: 123, role: "admin"}}
       params = %{"email" => "user@example.com", "name" => "John Doe"}
 
-      assert {:ok, user} = TestUserActions.run(:create_user, assigns, params)
+      assert {:ok, user} = TestUserActions.run(:create_user, params, assigns)
       assert user.email == "user@example.com"
       assert user.name == "John Doe"
       assert is_integer(user.id)
@@ -147,7 +147,7 @@ defmodule AxnIntegrationTest do
       assigns = %{current_user: %{id: 123, role: "user"}}
       params = %{"email" => "user@example.com", "name" => "John Doe"}
 
-      assert {:error, :unauthorized} = TestUserActions.run(:create_user, assigns, params)
+      assert {:error, :unauthorized} = TestUserActions.run(:create_user, params, assigns)
     end
 
     test "parameter validation failure" do
@@ -156,7 +156,7 @@ defmodule AxnIntegrationTest do
       params = %{"email" => "user@example.com"}
 
       assert {:error, %{reason: :invalid_params, changeset: changeset}} =
-               TestUserActions.run(:create_user, assigns, params)
+               TestUserActions.run(:create_user, params, assigns)
 
       refute changeset.valid?
       assert changeset.errors[:name]
@@ -168,7 +168,7 @@ defmodule AxnIntegrationTest do
       assigns = %{}
       params = %{"data" => "hello world"}
 
-      assert {:ok, result} = TestUserActions.run(:complex_operation, assigns, params)
+      assert {:ok, result} = TestUserActions.run(:complex_operation, params, assigns)
       assert result.processed == "HELLO WORLD"
       # Default value
       assert result.count == 1
@@ -179,7 +179,7 @@ defmodule AxnIntegrationTest do
       assigns = %{}
       params = %{"data" => "test", "count" => "5"}
 
-      assert {:ok, result} = TestUserActions.run(:complex_operation, assigns, params)
+      assert {:ok, result} = TestUserActions.run(:complex_operation, params, assigns)
       assert result.processed == "TEST"
       assert result.count == 5
     end
@@ -189,7 +189,7 @@ defmodule AxnIntegrationTest do
       large_data = String.duplicate("x", 101)
       params = %{"data" => large_data}
 
-      assert {:error, :data_too_large} = TestUserActions.run(:complex_operation, assigns, params)
+      assert {:error, :data_too_large} = TestUserActions.run(:complex_operation, params, assigns)
     end
   end
 
@@ -203,7 +203,7 @@ defmodule AxnIntegrationTest do
         "challenge_token" => "abc123"
       }
 
-      assert {:ok, response} = TestAuthActions.run(:request_otp, assigns, params)
+      assert {:ok, response} = TestAuthActions.run(:request_otp, params, assigns)
       assert response.message == "OTP sent"
       assert response.data.phone == "+1234567890"
       assert response.data.region == "US"
@@ -221,7 +221,7 @@ defmodule AxnIntegrationTest do
       }
 
       assert {:error, :authentication_required} =
-               TestAuthActions.run(:request_otp, assigns, params)
+               TestAuthActions.run(:request_otp, params, assigns)
     end
 
     test "custom validation failure" do
@@ -234,7 +234,7 @@ defmodule AxnIntegrationTest do
       }
 
       assert {:error, %{reason: :invalid_params, changeset: changeset}} =
-               TestAuthActions.run(:request_otp, assigns, params)
+               TestAuthActions.run(:request_otp, params, assigns)
 
       refute changeset.valid?
       assert changeset.errors[:phone]
@@ -248,7 +248,7 @@ defmodule AxnIntegrationTest do
         "challenge_token" => "abc123"
       }
 
-      assert {:ok, response} = TestAuthActions.run(:request_otp, assigns, params)
+      assert {:ok, response} = TestAuthActions.run(:request_otp, params, assigns)
       # Default value
       assert response.data.region == "US"
     end

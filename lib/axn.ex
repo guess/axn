@@ -141,14 +141,38 @@ defmodule Axn do
   defp generate_run_function do
     quote do
       @doc """
-      Runs an action with the given assigns and raw parameters.
+      Runs an action with the given parameters and source.
+
+      The source can be:
+      - A plain map (treated as assigns)
+      - A struct with an assigns field (e.g., Phoenix.Socket, Plug.Conn)
+      - Any other struct/map (treated as assigns)
 
       Returns `{:ok, result}` on success or `{:error, reason}` on failure.
+
+      ## Examples
+
+          # With plain assigns map
+          run(:create_user, %{"name" => "John"}, %{current_user: user})
+
+          # With Phoenix LiveView socket
+          run(:create_user, %{"name" => "John"}, socket)
+
+          # With Plug connection
+          run(:create_user, %{"name" => "John"}, conn)
       """
-      def run(action_name, assigns, raw_params) do
-        case run_action_pipeline(action_name, assigns, raw_params) do
+      def run(action, params, source) do
+        case run_action_pipeline(action, params, source) do
           %Axn.Context{result: result} -> normalize_result(result)
           {:error, reason} -> {:error, reason}
+        end
+      end
+
+      defp extract_assigns_and_source(source) do
+        case source do
+          %{assigns: assigns} -> {assigns, source}
+          assigns when is_map(assigns) -> {assigns, source}
+          _ -> {%{}, source}
         end
       end
     end
@@ -172,13 +196,16 @@ defmodule Axn do
 
   defp generate_pipeline_functions do
     quote do
-      defp run_action_pipeline(action_name, assigns, raw_params) do
-        case find_action(action_name) do
+      defp run_action_pipeline(action, params, source) do
+        case find_action(action) do
           {:ok, steps, action_opts} ->
+            {assigns, original_source} = extract_assigns_and_source(source)
+
             ctx = %Axn.Context{
-              action: action_name,
+              action: action,
               assigns: assigns,
-              params: raw_params
+              params: params,
+              private: %{source: original_source}
             }
 
             run_action_with_telemetry(ctx, steps, action_opts)
