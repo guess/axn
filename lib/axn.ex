@@ -23,7 +23,7 @@ defmodule Axn do
       end
   """
   defmacro __using__(opts) do
-    telemetry_prefix = Keyword.get(opts, :telemetry_prefix, [])
+    telemetry_prefix = Keyword.get(opts, :telemetry_prefix, [:axn])
 
     quote do
       import Axn, only: [action: 2, step: 1, step: 2]
@@ -107,10 +107,57 @@ defmodule Axn do
               private: %{raw_params: raw_params}
             }
 
-            run_step_pipeline(steps, ctx)
+            run_action_with_telemetry(ctx, steps)
 
           {:error, reason} ->
             {:error, reason}
+        end
+      end
+
+      defp run_action_with_telemetry(%Axn.Context{} = ctx, steps) do
+        metadata = extract_safe_metadata(ctx)
+
+        try do
+          :telemetry.span(
+            @telemetry_prefix,
+            metadata,
+            fn ->
+              result_ctx = run_step_pipeline(steps, ctx)
+              final_metadata = extract_safe_metadata(result_ctx)
+              {result_ctx, final_metadata}
+            end
+          )
+        rescue
+          # If telemetry span throws (because step raised), return error context
+          _exception ->
+            %{ctx | result: {:error, :step_exception}}
+        end
+      end
+
+      defp extract_safe_metadata(%Axn.Context{} = ctx) do
+        user_id = extract_user_id(ctx)
+
+        result_type =
+          case ctx.result do
+            {:ok, _} -> :ok
+            {:error, _} -> :error
+            nil -> :ok
+            _ -> :ok
+          end
+
+        %{
+          action: ctx.action,
+          user_id: user_id,
+          result_type: result_type
+        }
+        # Remove telemetry internal fields
+        |> Map.drop([:telemetry_span_context])
+      end
+
+      defp extract_user_id(%Axn.Context{} = ctx) do
+        case ctx.assigns do
+          %{current_user: %{id: id}} when is_binary(id) or is_integer(id) -> to_string(id)
+          _ -> nil
         end
       end
 
@@ -123,14 +170,9 @@ defmodule Axn do
 
       defp run_step_pipeline(steps, %Axn.Context{} = ctx) do
         Enum.reduce_while(steps, ctx, fn step, acc_ctx ->
-          try do
-            case apply_step(step, acc_ctx) do
-              {:cont, new_ctx} -> {:cont, new_ctx}
-              {:halt, result} -> {:halt, %{acc_ctx | result: result}}
-            end
-          rescue
-            _exception ->
-              {:halt, %{acc_ctx | result: {:error, :step_exception}}}
+          case apply_step(step, acc_ctx) do
+            {:cont, new_ctx} -> {:cont, new_ctx}
+            {:halt, result} -> {:halt, %{acc_ctx | result: result}}
           end
         end)
       end

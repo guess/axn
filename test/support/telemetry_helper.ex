@@ -10,16 +10,14 @@ defmodule Axn.TelemetryHelper do
   def capture_events(prefix \\ []) do
     ref = make_ref()
     handler_id = "test-handler-#{inspect(ref)}"
-    
+
     :telemetry.attach_many(
       handler_id,
       events_to_capture(prefix),
-      fn event, measurements, metadata, _acc ->
-        send(self(), {:telemetry_event, event, measurements, metadata})
-      end,
-      nil
+      &__MODULE__.handle_event/4,
+      self()
     )
-    
+
     {handler_id, ref}
   end
 
@@ -28,6 +26,11 @@ defmodule Axn.TelemetryHelper do
   """
   def cleanup({handler_id, _ref}) do
     :telemetry.detach(handler_id)
+  end
+
+  @doc false
+  def handle_event(event, measurements, metadata, test_pid) do
+    send(test_pid, {:telemetry_event, event, measurements, metadata})
   end
 
   @doc """
@@ -57,6 +60,7 @@ defmodule Axn.TelemetryHelper do
         else
           receive_matching_events(prefix, acc, timeout)
         end
+
       :timeout ->
         Enum.reverse(acc)
     end
@@ -64,15 +68,25 @@ defmodule Axn.TelemetryHelper do
 
   # Private helper to determine which events to capture
   defp events_to_capture([]) do
-    # Capture common telemetry events when no prefix specified
+    # Capture common telemetry span events (start, stop, exception)
     [
-      [:axn],
-      [:test_app, :actions],
-      [:custom, :prefix, :events]
+      [:axn, :start],
+      [:axn, :stop],
+      [:axn, :exception],
+      [:test_app, :actions, :start],
+      [:test_app, :actions, :stop],
+      [:test_app, :actions, :exception],
+      [:custom, :prefix, :start],
+      [:custom, :prefix, :stop],
+      [:custom, :prefix, :exception]
     ]
   end
 
   defp events_to_capture(prefix) when is_list(prefix) do
-    [prefix]
+    [
+      prefix ++ [:start],
+      prefix ++ [:stop],
+      prefix ++ [:exception]
+    ]
   end
 end
