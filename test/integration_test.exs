@@ -14,7 +14,7 @@ defmodule AxnIntegrationTest do
   # Example application module
   defmodule TestUserActions do
     @moduledoc false
-    use Axn, telemetry_prefix: [:test_app, :users]
+    use Axn
 
     action :create_user do
       step :cast_validate_params, schema: %{email!: :string, name!: :string}
@@ -85,7 +85,7 @@ defmodule AxnIntegrationTest do
   # Example with custom validation
   defmodule TestAuthActions do
     @moduledoc false
-    use Axn, telemetry_prefix: [:test_app, :auth]
+    use Axn
 
     action :request_otp do
       step :cast_validate_params,

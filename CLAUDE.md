@@ -29,7 +29,9 @@ An `Axn.Context` struct that flows through the step pipeline, carrying request d
 ### Module Declaration
 ```elixir
 defmodule MyApp.UserActions do
-  use Axn, telemetry_prefix: [:my_app, :users]
+  use Axn
+  # OR with custom metadata:
+  # use Axn, metadata: &__MODULE__.telemetry_metadata/1
 
   # Actions defined here...
 end
@@ -46,6 +48,12 @@ action :action_name do
   def step_name(ctx) do
     # Implementation
   end
+end
+
+# Action with custom telemetry metadata
+action :action_name, metadata: &metadata_function/1 do
+  step :step_name
+  # ...
 end
 ```
 
@@ -227,38 +235,74 @@ end
 ## Telemetry Integration
 
 ### Automatic Telemetry Events
-Every action automatically emits standard telemetry span events:
+Every action automatically emits standard telemetry events:
 
 ```elixir
-# Uses standard :telemetry.span/3 pattern
-:telemetry.span(
-  telemetry_prefix,  # e.g., [:my_app, :users]
-  %{},               # measurements (duration added automatically)  
-  %{action: action_name, ...}, # safe metadata
-  fn -> 
-    # Action execution happens here
+# Fixed event names - no configuration needed
+[:axn, :action, :start]     # When action starts
+[:axn, :action, :stop]      # When action completes  
+[:axn, :action, :exception] # When action fails with exception
+```
+
+### Event Metadata
+Telemetry events always include metadata in this precedence order:
+
+1. **Default metadata** (always included):
+   ```elixir
+   %{
+     module: MyApp.UserActions,  # The action module
+     action: :create_user,       # The action name
+     duration: 45                # Only on :stop events (milliseconds)
+   }
+   ```
+
+2. **Module-level metadata** (merged next, if provided)
+3. **Action-level metadata** (merged last, overrides duplicates)
+
+### Custom Metadata (Optional)
+Add custom metadata at the module level and/or action level:
+
+```elixir
+defmodule MyApp.UserActions do
+  use Axn, metadata: &__MODULE__.module_metadata/1
+
+  # Module-level metadata (applies to all actions)
+  def module_metadata(ctx) do
+    %{
+      user_id: ctx.assigns.current_user && ctx.assigns.current_user.id,
+      tenant: ctx.assigns.tenant && ctx.assigns.tenant.slug
+    }
   end
-)
+
+  # Action-specific metadata
+  action :create_user, metadata: &action_metadata/1 do
+    step :validate_params
+    step :create_user
+  end
+
+  def action_metadata(ctx) do
+    %{
+      resource_type: :user,
+      creation_method: ctx.params[:method] || "standard"
+    }
+  end
+end
+
+# Final merged metadata (precedence: default → module → action):
+# %{
+#   module: MyApp.UserActions,        # Default
+#   action: :create_user,             # Default  
+#   duration: 45,                     # Default (on :stop events only)
+#   user_id: 123,                     # Module-level
+#   tenant: "acme",                   # Module-level
+#   resource_type: :user,             # Action-level
+#   creation_method: "standard"       # Action-level
+# }
 ```
 
-### Event Naming
-- **Default**: Uses `telemetry_prefix` from module configuration
-- **Format**: `use Axn, telemetry_prefix: [:my_app, :users]` → events at `[:my_app, :users]`
-- **Default prefix**: `[:axn]` when no telemetry_prefix specified
+**Metadata Precedence**: Action-level metadata is merged with module-level metadata, with action-level taking precedence for duplicate keys.
 
-### Safe Metadata (Allowlist Approach)
-Telemetry automatically includes only these safe metadata fields:
-
-```elixir
-# Safe metadata (automatically included)
-%{
-  action: atom(),           # The action being executed  
-  user_id: binary() | nil, # From ctx.assigns.current_user.id if present
-  result_type: :ok | :error # Whether action succeeded or failed
-}
-```
-
-**Security**: Only the above 3 fields are included. Raw params, changeset errors, assigns, and all other context data are never included in telemetry metadata to prevent sensitive data leaks.
+**Security**: Both metadata functions let you control exactly what data is included. Only include safe, non-sensitive information in telemetry events.
 
 ## Implementation Requirements
 
@@ -294,8 +338,8 @@ defp run_action_with_telemetry(%Axn.Context{} = ctx, steps) -> %Axn.Context{}
 
 ### 4. Module Attribute Tracking
 During compilation, track:
-- `@actions` - List of `{action_name, steps}`
-- `@telemetry_prefix` - Default telemetry prefix for the module
+- `@actions` - List of `{action_name, steps, action_opts}`
+- `@telemetry_metadata_fn` - Optional module-level metadata function
 - `@current_action` and `@steps` - For building actions during macro expansion
 
 ## Built-in Steps Implementation
@@ -456,9 +500,9 @@ end
 ```elixir
 # lib/my_app/user_actions.ex
 defmodule MyApp.UserActions do
-  use Axn, telemetry_prefix: [:my_app, :users]
+  use Axn, metadata: &__MODULE__.telemetry_metadata/1
 
-  action :create_user do
+  action :create_user, metadata: &create_user_metadata/1 do
     step :cast_validate_params, schema: %{email!: :string, name!: :string}
     step :require_admin
     step :handle_create
@@ -476,6 +520,20 @@ defmodule MyApp.UserActions do
         {:ok, user} -> {:halt, {:ok, user}}
         {:error, changeset} -> {:halt, {:error, %{reason: :creation_failed, changeset: changeset}}}
       end
+    end
+
+    def telemetry_metadata(ctx) do
+      %{
+        user_id: ctx.assigns.current_user && ctx.assigns.current_user.id,
+        tenant: ctx.assigns.tenant && ctx.assigns.tenant.slug
+      }
+    end
+
+    def create_user_metadata(ctx) do
+      %{
+        admin_creation: admin?(ctx.assigns.current_user),
+        email_domain: ctx.params[:email] |> String.split("@") |> List.last()
+      }
     end
 
     defp admin?(user), do: user && user.role == "admin"

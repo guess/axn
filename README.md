@@ -30,7 +30,7 @@ end
 
 ```elixir
 defmodule MyApp.UserActions do
-  use Axn, telemetry_prefix: [:my_app, :users]
+  use Axn
 
   action :create_user do
     step :cast_validate_params, schema: %{email!: :string, name!: :string}
@@ -222,37 +222,135 @@ end
 
 Axn automatically emits telemetry events for every action using the standard `:telemetry.span/3` pattern:
 
+### Fixed Event Names
+
+All Axn actions emit events with fixed names for consistency:
+
+```elixir
+[:axn, :action, :start]     # When action starts
+[:axn, :action, :stop]      # When action completes
+[:axn, :action, :exception] # When action fails with exception
+```
+
+### Basic Usage
+
 ```elixir
 defmodule MyApp.UserActions do
-  use Axn, telemetry_prefix: [:my_app, :users]
-  # Events will be emitted at [:my_app, :users, :start] and [:my_app, :users, :stop]
+  use Axn
+  
+  action :create_user do
+    step :validate_params
+    step :create_user
+  end
 end
+
+# Default metadata: %{module: MyApp.UserActions, action: :create_user}
 ```
 
-### Safe Metadata
+### Custom Metadata
 
-Telemetry metadata includes only these safe fields (sensitive data is never included):
+You can add custom metadata at the module level and/or action level:
+
+#### Module-Level Metadata
 
 ```elixir
-%{
-  action: atom(),           # The action being executed
-  user_id: binary() | nil, # From ctx.assigns.current_user.id if present
-  result_type: :ok | :error # Whether action succeeded or failed
-}
+defmodule MyApp.UserActions do
+  use Axn, metadata: &__MODULE__.telemetry_metadata/1
+  
+  def telemetry_metadata(ctx) do
+    %{
+      user_id: ctx.assigns.current_user && ctx.assigns.current_user.id,
+      tenant: ctx.assigns.tenant && ctx.assigns.tenant.slug
+    }
+  end
+  
+  action :create_user do
+    step :validate_params
+    step :create_user
+  end
+end
+
+# Metadata: %{module: MyApp.UserActions, action: :create_user, user_id: "123", tenant: "acme"}
 ```
+
+#### Action-Level Metadata
+
+```elixir
+defmodule MyApp.UserActions do
+  use Axn, metadata: &__MODULE__.module_metadata/1
+  
+  action :create_user, metadata: &create_user_metadata/1 do
+    step :validate_params
+    step :create_user
+  end
+  
+  def module_metadata(ctx) do
+    %{user_id: ctx.assigns.current_user && ctx.assigns.current_user.id}
+  end
+  
+  def create_user_metadata(ctx) do
+    %{
+      email_domain: extract_domain(ctx.params.email),
+      admin_creation: admin?(ctx.assigns.current_user)
+    }
+  end
+end
+
+# Final metadata includes both module and action metadata:
+# %{module: MyApp.UserActions, action: :create_user, user_id: "123", 
+#   email_domain: "example.com", admin_creation: false}
+```
+
+#### Metadata Precedence
+
+Metadata is merged in this order (later overrides earlier):
+1. **Default**: `%{module: ModuleName, action: :action_name}`
+2. **Module-level**: From `use Axn, metadata: &function/1`
+3. **Action-level**: From `action :name, metadata: &function/1`
 
 ### Subscribing to Events
 
 ```elixir
 :telemetry.attach(
   "my-handler",
-  [:my_app, :users, :stop],
+  [:axn, :action, :stop],
   &handle_action_complete/4,
   nil
 )
 
 def handle_action_complete(event, measurements, metadata, _config) do
-  Logger.info("Action #{metadata.action} completed in #{measurements.duration}μs")
+  Logger.info("#{metadata.module}.#{metadata.action} completed in #{measurements.duration}μs")
+end
+```
+
+### Organizational Patterns
+
+Create base modules for consistent metadata across your application:
+
+```elixir
+defmodule MyApp.BaseActions do
+  defmacro __using__(_opts) do
+    quote do
+      use Axn, metadata: &MyApp.BaseActions.common_metadata/1
+    end
+  end
+  
+  def common_metadata(ctx) do
+    %{
+      user_id: ctx.assigns.current_user && ctx.assigns.current_user.id,
+      tenant_id: ctx.assigns.tenant && ctx.assigns.tenant.id,
+      request_id: ctx.assigns.request_id
+    }
+  end
+end
+
+# Now all your action modules get common metadata automatically
+defmodule MyApp.UserActions do
+  use MyApp.BaseActions  # Gets common metadata
+  
+  action :create_user, metadata: &create_metadata/1 do
+    # Action-specific metadata still available
+  end
 end
 ```
 
@@ -418,7 +516,7 @@ end
 
 ```elixir
 defmodule MyApp.UserActions do
-  use Axn, telemetry_prefix: [:my_app, :users]
+  use Axn
 
   action :create_user do
     step :cast_validate_params, schema: %{email!: :string, name!: :string}

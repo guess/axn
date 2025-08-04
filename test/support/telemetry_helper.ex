@@ -68,23 +68,11 @@ defmodule Axn.TelemetryHelper do
 
   # Private helper to determine which events to capture
   defp events_to_capture([]) do
-    # Capture common telemetry span events (start, stop, exception)
+    # Capture fixed telemetry events (new simplified system)
     [
-      [:axn, :start],
-      [:axn, :stop],
-      [:axn, :exception],
-      [:test_app, :actions, :start],
-      [:test_app, :actions, :stop],
-      [:test_app, :actions, :exception],
-      [:custom, :prefix, :start],
-      [:custom, :prefix, :stop],
-      [:custom, :prefix, :exception],
-      [:my_app, :users, :start],
-      [:my_app, :users, :stop],
-      [:my_app, :users, :exception],
-      [:my_app, :payments, :start],
-      [:my_app, :payments, :stop],
-      [:my_app, :payments, :exception]
+      [:axn, :action, :start],
+      [:axn, :action, :stop],
+      [:axn, :action, :exception]
     ]
   end
 

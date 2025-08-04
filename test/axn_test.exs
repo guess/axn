@@ -2,10 +2,10 @@ defmodule AxnTest do
   use ExUnit.Case
 
   describe "Axn DSL basic compilation" do
-    test "basic module compilation and telemetry_prefix" do
+    test "basic module compilation" do
       defmodule BasicCompilationModule do
         @moduledoc false
-        use Axn, telemetry_prefix: [:test, :basic]
+        use Axn
 
         action :simple do
         end
@@ -26,7 +26,7 @@ defmodule AxnTest do
     test "multiple actions with various features" do
       defmodule CompleteActionModule do
         @moduledoc false
-        use Axn, telemetry_prefix: [:test, :complete]
+        use Axn
 
         action :first_action do
         end
@@ -63,7 +63,7 @@ defmodule AxnTest do
     test "steps with and without options, plus halt behavior" do
       defmodule StepTestModule do
         @moduledoc false
-        use Axn, telemetry_prefix: [:test, :steps]
+        use Axn
 
         action :single_step do
           step :single_step
@@ -127,7 +127,7 @@ defmodule AxnTest do
 
       defmodule WithExternalStepModule do
         @moduledoc false
-        use Axn, telemetry_prefix: [:test, :external]
+        use Axn
 
         action :use_external do
           step {ExternalStepModule, :external_step}, message: "from external"
@@ -142,7 +142,7 @@ defmodule AxnTest do
     test "context flow, execution order, and data access" do
       defmodule PipelineTestModule do
         @moduledoc false
-        use Axn, telemetry_prefix: [:test, :pipeline]
+        use Axn
 
         action :context_flow do
           step :check_inputs

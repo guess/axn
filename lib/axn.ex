@@ -11,29 +11,40 @@ defmodule Axn do
 
   ## Options
 
-  * `:telemetry_prefix` - List of atoms that form the telemetry event prefix.
-    Defaults to the module name converted to atoms.
+  * `:metadata` - Function that takes a context and returns a map of custom metadata
+    for telemetry events. Optional.
 
   ## Examples
 
       defmodule MyApp.UserActions do
-        use Axn, telemetry_prefix: [:my_app, :users]
+        use Axn
 
         action :create_user do
           # Action definition
         end
       end
+
+      defmodule MyApp.UserActions do
+        use Axn, metadata: &__MODULE__.telemetry_metadata/1
+
+        def telemetry_metadata(ctx) do
+          %{
+            user_id: ctx.assigns.current_user && ctx.assigns.current_user.id,
+            tenant: ctx.assigns.tenant && ctx.assigns.tenant.slug
+          }
+        end
+      end
   """
   defmacro __using__(opts) do
-    telemetry_prefix = Keyword.get(opts, :telemetry_prefix, [:axn])
+    metadata_fn = Keyword.get(opts, :metadata)
 
     quote do
-      import Axn, only: [action: 2, step: 1, step: 2]
+      import Axn, only: [action: 2, action: 3, step: 1, step: 2]
       import Axn.Context
 
       alias Axn.Context
 
-      @telemetry_prefix unquote(telemetry_prefix)
+      @telemetry_metadata_fn unquote(metadata_fn)
       @actions []
       @current_action nil
       @steps []
@@ -52,6 +63,11 @@ defmodule Axn do
         step :authorize, &can_create_users?/1
         step :handle_create
       end
+
+      action :create_user, metadata: &action_metadata/1 do
+        step :cast_validate_params, schema: %{name!: :string}
+        step :handle_create
+      end
   """
   defmacro action(name, do: block) do
     quote do
@@ -60,7 +76,35 @@ defmodule Axn do
 
       unquote(block)
 
-      @actions [{unquote(name), Enum.reverse(@steps)} | @actions]
+      @actions [{unquote(name), Enum.reverse(@steps), []} | @actions]
+      @current_action nil
+      @steps []
+    end
+  end
+
+  @doc """
+  Defines an action with options and its steps.
+
+  ## Options
+
+  * `:metadata` - Function that takes a context and returns a map of action-specific metadata
+    for telemetry events. Optional.
+
+  ## Examples
+
+      action :create_user, metadata: &create_user_metadata/1 do
+        step :cast_validate_params, schema: %{name!: :string}
+        step :handle_create
+      end
+  """
+  defmacro action(name, opts, do: block) do
+    quote do
+      @current_action unquote(name)
+      @steps []
+
+      unquote(block)
+
+      @actions [{unquote(name), Enum.reverse(@steps), unquote(opts)} | @actions]
       @current_action nil
       @steps []
     end
@@ -118,8 +162,8 @@ defmodule Axn do
       defp normalize_result(other), do: {:ok, other}
 
       defp find_action(action_name) do
-        case Enum.find(@actions, fn {name, _steps} -> name == action_name end) do
-          {_name, steps} -> {:ok, steps}
+        case Enum.find(@actions, fn {name, _steps, _opts} -> name == action_name end) do
+          {_name, steps, opts} -> {:ok, steps, opts}
           nil -> {:error, :action_not_found}
         end
       end
@@ -130,14 +174,14 @@ defmodule Axn do
     quote do
       defp run_action_pipeline(action_name, assigns, raw_params) do
         case find_action(action_name) do
-          {:ok, steps} ->
+          {:ok, steps, action_opts} ->
             ctx = %Axn.Context{
               action: action_name,
               assigns: assigns,
               params: raw_params
             }
 
-            run_action_with_telemetry(ctx, steps)
+            run_action_with_telemetry(ctx, steps, action_opts)
 
           {:error, reason} ->
             {:error, reason}
@@ -157,16 +201,16 @@ defmodule Axn do
 
   defp generate_telemetry_functions do
     quote do
-      defp run_action_with_telemetry(%Axn.Context{} = ctx, steps) do
-        metadata = extract_safe_metadata(ctx)
+      defp run_action_with_telemetry(%Axn.Context{} = ctx, steps, action_opts) do
+        metadata = build_telemetry_metadata(ctx, action_opts)
 
         try do
           :telemetry.span(
-            @telemetry_prefix,
+            [:axn, :action],
             metadata,
             fn ->
               result_ctx = run_step_pipeline(steps, ctx)
-              final_metadata = extract_safe_metadata(result_ctx)
+              final_metadata = build_telemetry_metadata(result_ctx, action_opts)
               {result_ctx, final_metadata}
             end
           )
@@ -179,18 +223,32 @@ defmodule Axn do
         end
       end
 
-      defp extract_safe_metadata(%Axn.Context{} = ctx) do
-        %{
-          action: ctx.action,
-          user_id: get_user_id(ctx),
-          result_type: if(match?({:error, _}, ctx.result), do: :error, else: :ok)
-        }
+      defp build_telemetry_metadata(%Axn.Context{} = ctx, action_opts) do
+        # Always include module and action for filtering/debugging
+        %{module: __MODULE__, action: ctx.action}
+        |> Map.merge(get_module_metadata(ctx))
+        |> Map.merge(get_action_metadata(ctx, action_opts))
       end
 
-      defp get_user_id(%Axn.Context{assigns: %{current_user: %{id: id}}}) when is_binary(id) or is_integer(id),
-        do: to_string(id)
+      defp get_action_metadata(ctx, action_opts) do
+        action_opts
+        |> Keyword.get(:metadata)
+        |> safe_call_metadata_fn(ctx)
+      end
 
-      defp get_user_id(_), do: nil
+      defp get_module_metadata(ctx) do
+        safe_call_metadata_fn(@telemetry_metadata_fn, ctx)
+      end
+
+      defp safe_call_metadata_fn(metadata_fn, ctx) when is_function(metadata_fn) do
+        metadata_fn.(ctx) || %{}
+      rescue
+        _ -> %{}
+      end
+
+      defp safe_call_metadata_fn(_metadata_fn, _ctx) do
+        %{}
+      end
     end
   end
 
