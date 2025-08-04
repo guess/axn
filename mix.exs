@@ -31,7 +31,7 @@ defmodule Axn.MixProject do
     [
       {:credo, "~> 1.0", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.31", only: [:dev], runtime: false},
-      {:params, github: "guess/params", ref: "1c1c2720786fa0f5e29788d7b27801241400df1a"},
+      {:params, "~> 2.0"},
       {:styler, "~> 1.1", only: [:dev, :test]}
     ]
   end
