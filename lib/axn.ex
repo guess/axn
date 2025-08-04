@@ -91,12 +91,15 @@ defmodule Axn do
       """
       def run(action_name, assigns, raw_params) do
         case run_action_pipeline(action_name, assigns, raw_params) do
-          %Axn.Context{result: {:ok, value}} -> {:ok, value}
-          %Axn.Context{result: {:error, reason}} -> {:error, reason}
-          %Axn.Context{result: result} -> {:ok, result}
+          %Axn.Context{result: result} -> normalize_result(result)
           {:error, reason} -> {:error, reason}
         end
       end
+
+      defp normalize_result({:ok, value}), do: {:ok, value}
+      defp normalize_result({:error, reason}), do: {:error, reason}
+      defp normalize_result(nil), do: {:ok, nil}
+      defp normalize_result(other), do: {:ok, other}
 
       defp run_action_pipeline(action_name, assigns, raw_params) do
         case find_action(action_name) do
@@ -132,8 +135,7 @@ defmodule Axn do
             # Preserve exception information for debugging
             %{
               ctx
-              | result:
-                  {:error, %{reason: :step_exception, message: Exception.message(exception)}}
+              | result: {:error, %{reason: :step_exception, message: Exception.message(exception)}}
             }
         end
       end
@@ -146,9 +148,8 @@ defmodule Axn do
         }
       end
 
-      defp get_user_id(%Axn.Context{assigns: %{current_user: %{id: id}}})
-           when is_binary(id) or is_integer(id),
-           do: to_string(id)
+      defp get_user_id(%Axn.Context{assigns: %{current_user: %{id: id}}}) when is_binary(id) or is_integer(id),
+        do: to_string(id)
 
       defp get_user_id(_), do: nil
 
@@ -174,15 +175,15 @@ defmodule Axn do
             Axn.Steps.CastValidateParams.cast_validate_params(ctx, opts)
 
           _ ->
-            apply_step_function(__MODULE__, step_name, ctx, opts, :step_not_found)
+            apply_step_function(__MODULE__, step_name, ctx, opts)
         end
       end
 
       defp apply_step({{module, function}, opts}, %Axn.Context{} = ctx) do
-        apply_step_function(module, function, ctx, opts, :external_step_not_found)
+        apply_step_function(module, function, ctx, opts)
       end
 
-      defp apply_step_function(module, function, ctx, opts, error_type) do
+      defp apply_step_function(module, function, ctx, opts) do
         cond do
           function_exported?(module, function, 2) ->
             apply(module, function, [ctx, opts])
@@ -191,7 +192,7 @@ defmodule Axn do
             apply(module, function, [ctx])
 
           true ->
-            {:halt, {:error, error_type}}
+            {:halt, {:error, :step_not_found}}
         end
       end
     end

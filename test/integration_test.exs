@@ -1,7 +1,7 @@
 defmodule AxnIntegrationTest do
   @moduledoc """
   Core integration tests covering end-to-end functionality.
-  
+
   These tests verify that the main usage patterns work correctly
   with real-world scenarios.
   """
@@ -119,7 +119,7 @@ defmodule AxnIntegrationTest do
         otp_data = %{
           phone: ctx.params.phone,
           region: ctx.params.region,
-          otp_code: :rand.uniform(999999) |> Integer.to_string() |> String.pad_leading(6, "0"),
+          otp_code: :rand.uniform(999_999) |> Integer.to_string() |> String.pad_leading(6, "0"),
           expires_at: DateTime.add(DateTime.utc_now(), 300, :second)
         }
 
@@ -149,11 +149,12 @@ defmodule AxnIntegrationTest do
 
     test "parameter validation failure" do
       assigns = %{current_user: %{id: 123, role: "admin"}}
-      params = %{"email" => "user@example.com"}  # Missing required name
+      # Missing required name
+      params = %{"email" => "user@example.com"}
 
-      assert {:error, %{reason: :invalid_params, changeset: changeset}} = 
-        TestUserActions.run(:create_user, assigns, params)
-      
+      assert {:error, %{reason: :invalid_params, changeset: changeset}} =
+               TestUserActions.run(:create_user, assigns, params)
+
       refute changeset.valid?
       assert changeset.errors[:name]
     end
@@ -166,7 +167,8 @@ defmodule AxnIntegrationTest do
 
       assert {:ok, result} = TestUserActions.run(:complex_operation, assigns, params)
       assert result.processed == "HELLO WORLD"
-      assert result.count == 1  # Default value
+      # Default value
+      assert result.count == 1
       assert %DateTime{} = result.timestamp
     end
 
@@ -191,8 +193,9 @@ defmodule AxnIntegrationTest do
   describe "authentication flow with custom validation" do
     test "successful OTP request" do
       assigns = %{current_user: %{id: 123}}
+
       params = %{
-        "phone" => "+1234567890", 
+        "phone" => "+1234567890",
         "region" => "US",
         "challenge_token" => "abc123"
       }
@@ -206,39 +209,45 @@ defmodule AxnIntegrationTest do
     end
 
     test "authentication failure" do
-      assigns = %{}  # No current_user
+      # No current_user
+      assigns = %{}
+
       params = %{
         "phone" => "+1234567890",
         "challenge_token" => "abc123"
       }
 
-      assert {:error, :authentication_required} = 
-        TestAuthActions.run(:request_otp, assigns, params)
+      assert {:error, :authentication_required} =
+               TestAuthActions.run(:request_otp, assigns, params)
     end
 
     test "custom validation failure" do
       assigns = %{current_user: %{id: 123}}
+
       params = %{
-        "phone" => "1234567890",  # Missing +
+        # Missing +
+        "phone" => "1234567890",
         "challenge_token" => "abc123"
       }
 
-      assert {:error, %{reason: :invalid_params, changeset: changeset}} = 
-        TestAuthActions.run(:request_otp, assigns, params)
-      
+      assert {:error, %{reason: :invalid_params, changeset: changeset}} =
+               TestAuthActions.run(:request_otp, assigns, params)
+
       refute changeset.valid?
       assert changeset.errors[:phone]
     end
 
     test "uses default region when not provided" do
       assigns = %{current_user: %{id: 123}}
+
       params = %{
         "phone" => "+1234567890",
         "challenge_token" => "abc123"
       }
 
       assert {:ok, response} = TestAuthActions.run(:request_otp, assigns, params)
-      assert response.data.region == "US"  # Default value
+      # Default value
+      assert response.data.region == "US"
     end
   end
 
