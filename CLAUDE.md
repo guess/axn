@@ -217,37 +217,38 @@ end
 ## Telemetry Integration
 
 ### Automatic Telemetry Events
-Every action automatically emits telemetry events with safe defaults:
+Every action automatically emits standard telemetry span events:
 
 ```elixir
-# When action starts
-:telemetry.span_start(event_name, measurements, metadata)
-
-# When action succeeds
-:telemetry.span_end(span_id, success_measurements)
-
-# When action fails
-:telemetry.span_end(span_id, error_measurements)
+# Uses standard :telemetry.span/3 pattern
+:telemetry.span(
+  telemetry_prefix,  # e.g., [:my_app, :users]
+  %{},               # measurements (duration added automatically)  
+  %{action: action_name, ...}, # safe metadata
+  fn -> 
+    # Action execution happens here
+  end
+)
 ```
 
 ### Event Naming
-- **Default**: `telemetry_prefix ++ [action_name]` (always enabled)
-- Uses the `telemetry_prefix` from `use Axn, telemetry_prefix: [:my_app, :users]`
+- **Default**: Uses `telemetry_prefix` from module configuration
+- **Format**: `use Axn, telemetry_prefix: [:my_app, :users]` → events at `[:my_app, :users]`
+- **Default prefix**: `[:axn]` when no telemetry_prefix specified
 
-### Safe Metadata (No Configuration Required)
-Telemetry automatically includes only safe metadata to prevent data leaks:
+### Safe Metadata (Allowlist Approach)
+Telemetry automatically includes only these safe metadata fields:
 
 ```elixir
-# Default metadata (automatically included)
+# Safe metadata (automatically included)
 %{
-  action_name: atom(),           # The action being executed
-  user_id: binary() | nil,      # From ctx.assigns.current_user.id if present
-  duration_ms: integer(),        # Action execution time
-  result_type: :ok | :error     # Whether action succeeded or failed
+  action: atom(),           # The action being executed  
+  user_id: binary() | nil, # From ctx.assigns.current_user.id if present
+  result_type: :ok | :error # Whether action succeeded or failed
 }
 ```
 
-**Security**: Raw params, changeset errors, and assigns are never included in telemetry metadata to prevent sensitive data leaks.
+**Security**: Only the above 3 fields are included. Raw params, changeset errors, assigns, and all other context data are never included in telemetry metadata to prevent sensitive data leaks.
 
 ## Implementation Requirements
 
@@ -416,9 +417,12 @@ lib/
 │       └── business_steps.ex      # Your custom business logic steps
 
 test/
+├── support/
+│   └── telemetry_helper.ex       # Simple telemetry test helper
 ├── axn/
 │   ├── axn_test.exs              # Test core DSL functionality
 │   └── steps_test.exs            # Test built-in steps
+│   └── telemetry_test.exs        # Test telemetry integration (simplified)
 └── my_app/
     ├── accounts/
     │   └── user_actions_test.exs  # Test your action modules
@@ -523,15 +527,22 @@ end
 - [x] Write failing tests for graceful handling of step exceptions
 - [x] Implement exception handling in step pipeline
 
-### Phase 5: Telemetry Integration with TDD
-- [ ] Write failing tests for automatic telemetry span wrapping
-- [ ] Implement telemetry span functionality
-- [ ] Write failing tests for configurable event naming
+### Phase 5: Telemetry Integration with TDD ✅ **TESTS WRITTEN & SIMPLIFIED**
+- [x] Write failing tests for automatic telemetry span wrapping (simplified to use standard `:telemetry.span/3`)
+- [ ] Implement telemetry span functionality using standard patterns
+- [x] Write failing tests for configurable event naming (simplified to use telemetry_prefix directly)
 - [ ] Implement event naming configuration
-- [ ] Write failing tests for safe metadata extraction
-- [ ] Implement safe metadata extraction with security defaults
-- [ ] Write failing tests for error telemetry with proper span ending
-- [ ] Implement error telemetry handling
+- [x] Write failing tests for safe metadata extraction (simplified to 3-field allowlist)
+- [ ] Implement safe metadata extraction with allowlist approach  
+- [x] Write failing tests for telemetry reliability (simplified, removed complex concurrency tests)
+- [ ] Implement telemetry handling with standard patterns
+
+**Simplification Notes**: 
+- Removed complex test setup boilerplate in favor of `TelemetryHelper` module
+- Switched from custom `:start/:stop/:exception` events to standard `:telemetry.span/3` pattern
+- Replaced "security theater" (testing absence of 15+ fields) with simple 3-field allowlist
+- Eliminated duration duplication and unnecessary concurrency testing
+- Reduced test count from 20 complex tests to 9 focused tests
 
 ### Phase 6: Integration Tests & Polish
 - [ ] Write end-to-end integration tests using example action modules
