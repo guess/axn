@@ -1,13 +1,21 @@
 defmodule Axn.MixProject do
   use Mix.Project
 
+  @version "0.1.0"
+  @source_url "https://github.com/guess/axn"
+
   def project do
     [
       app: :axn,
-      version: "0.1.0",
+      version: @version,
       elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      description: description(),
+      package: package(),
+      docs: docs(),
+      name: "Axn",
+      source_url: @source_url
     ]
   end
 
@@ -22,10 +30,47 @@ defmodule Axn.MixProject do
   defp deps do
     [
       {:credo, "~> 1.0", only: [:dev, :test], runtime: false},
+      {:ex_doc, "~> 0.31", only: [:dev], runtime: false},
       {:params, github: "guess/params", ref: "1c1c2720786fa0f5e29788d7b27801241400df1a"},
       {:styler, "~> 1.1", only: [:dev, :test]}
-      # {:dep_from_hexpm, "~> 0.3.0"},
-      # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
+    ]
+  end
+
+  defp description do
+    """
+    A clean, step-based DSL library for defining actions with parameter validation, 
+    authorization, telemetry, and custom business logic. Prioritizes simplicity, 
+    explicitness, and ease of following execution flow.
+    """
+  end
+
+  defp package do
+    [
+      files: ~w(lib .formatter.exs mix.exs README.md LICENSE CHANGELOG.md),
+      licenses: ["MIT"],
+      links: %{
+        "GitHub" => @source_url,
+        "Documentation" => "https://hexdocs.pm/axn"
+      },
+      maintainers: ["Steve Domin"]
+    ]
+  end
+
+  defp docs do
+    [
+      main: "Axn",
+      source_ref: "v#{@version}",
+      source_url: @source_url,
+      extras: [
+        "README.md",
+        "CHANGELOG.md",
+        "docs/testing.md",
+        "docs/telemetry.md",
+        "docs/advanced.md"
+      ],
+      groups_for_extras: [
+        Guides: ~r/docs\/.*/
+      ]
     ]
   end
 end
