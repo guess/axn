@@ -243,12 +243,15 @@ defmodule Axn.ErrorHandlingTest do
       end
 
       # All exception types return the same simple error
-      assert {:error, :step_exception} = MultipleExceptionTypesModule.run(:argument_error, %{}, %{})
-      assert {:error, :step_exception} = MultipleExceptionTypesModule.run(:runtime_error, %{}, %{})
+      assert {:error, :step_exception} =
+               MultipleExceptionTypesModule.run(:argument_error, %{}, %{})
+
+      assert {:error, :step_exception} =
+               MultipleExceptionTypesModule.run(:runtime_error, %{}, %{})
+
       assert {:error, :step_exception} = MultipleExceptionTypesModule.run(:custom_error, %{}, %{})
       assert {:error, :step_exception} = MultipleExceptionTypesModule.run(:system_error, %{}, %{})
     end
-
 
     test "pipeline continues to work after exceptions in other actions" do
       defmodule PipelineResilienceModule do
