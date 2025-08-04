@@ -527,15 +527,15 @@ end
 - [x] Write failing tests for graceful handling of step exceptions
 - [x] Implement exception handling in step pipeline
 
-### Phase 5: Telemetry Integration with TDD ✅ **TESTS WRITTEN & SIMPLIFIED**
+### Phase 5: Telemetry Integration with TDD ✅ **COMPLETED**
 - [x] Write failing tests for automatic telemetry span wrapping (simplified to use standard `:telemetry.span/3`)
-- [ ] Implement telemetry span functionality using standard patterns
+- [x] Implement telemetry span functionality using standard patterns
 - [x] Write failing tests for configurable event naming (simplified to use telemetry_prefix directly)
-- [ ] Implement event naming configuration
+- [x] Implement event naming configuration
 - [x] Write failing tests for safe metadata extraction (simplified to 3-field allowlist)
-- [ ] Implement safe metadata extraction with allowlist approach  
+- [x] Implement safe metadata extraction with allowlist approach  
 - [x] Write failing tests for telemetry reliability (simplified, removed complex concurrency tests)
-- [ ] Implement telemetry handling with standard patterns
+- [x] Implement telemetry handling with standard patterns
 
 **Simplification Notes**: 
 - Removed complex test setup boilerplate in favor of `TelemetryHelper` module

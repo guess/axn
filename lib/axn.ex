@@ -128,38 +128,22 @@ defmodule Axn do
             end
           )
         rescue
-          # If telemetry span throws (because step raised), return error context
-          _exception ->
-            %{ctx | result: {:error, :step_exception}}
+          exception ->
+            # Preserve exception information for debugging
+            %{ctx | result: {:error, %{reason: :step_exception, message: Exception.message(exception)}}}
         end
       end
 
       defp extract_safe_metadata(%Axn.Context{} = ctx) do
-        user_id = extract_user_id(ctx)
-
-        result_type =
-          case ctx.result do
-            {:ok, _} -> :ok
-            {:error, _} -> :error
-            nil -> :ok
-            _ -> :ok
-          end
-
         %{
           action: ctx.action,
-          user_id: user_id,
-          result_type: result_type
+          user_id: get_user_id(ctx),
+          result_type: if(match?({:error, _}, ctx.result), do: :error, else: :ok)
         }
-        # Remove telemetry internal fields
-        |> Map.drop([:telemetry_span_context])
       end
 
-      defp extract_user_id(%Axn.Context{} = ctx) do
-        case ctx.assigns do
-          %{current_user: %{id: id}} when is_binary(id) or is_integer(id) -> to_string(id)
-          _ -> nil
-        end
-      end
+      defp get_user_id(%Axn.Context{assigns: %{current_user: %{id: id}}}) when is_binary(id) or is_integer(id), do: to_string(id)
+      defp get_user_id(_), do: nil
 
       defp find_action(action_name) do
         case Enum.find(@actions, fn {name, _steps} -> name == action_name end) do

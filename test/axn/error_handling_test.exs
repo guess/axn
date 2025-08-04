@@ -184,7 +184,8 @@ defmodule Axn.ErrorHandlingTest do
 
       {:error, error} = ExceptionHandlingModule.run(:step_raises_exception, %{}, %{})
 
-      assert error == :step_exception
+      assert error.reason == :step_exception
+      assert error.message == "Something went wrong in the step"
     end
 
     test "external step exceptions are handled gracefully" do
@@ -214,7 +215,8 @@ defmodule Axn.ErrorHandlingTest do
 
       {:error, error} = WithExternalExceptionModule.run(:external_step_raises, %{}, %{})
 
-      assert error == :step_exception
+      assert error.reason == :step_exception
+      assert String.contains?(error.message, "External step failed")
     end
 
     test "multiple exception types are handled consistently" do
@@ -242,15 +244,19 @@ defmodule Axn.ErrorHandlingTest do
         end
       end
 
-      # All exception types return the same simple error
-      assert {:error, :step_exception} =
+      # All exception types return consistent error structure with preserved messages
+      assert {:error, %{reason: :step_exception, message: "Invalid argument"}} =
                MultipleExceptionTypesModule.run(:argument_error, %{}, %{})
 
-      assert {:error, :step_exception} =
+      assert {:error, %{reason: :step_exception, message: "Runtime failure"}} =
                MultipleExceptionTypesModule.run(:runtime_error, %{}, %{})
 
-      assert {:error, :step_exception} = MultipleExceptionTypesModule.run(:custom_error, %{}, %{})
-      assert {:error, :step_exception} = MultipleExceptionTypesModule.run(:system_error, %{}, %{})
+      assert {:error, %{reason: :step_exception, message: "Custom error message"}} = 
+               MultipleExceptionTypesModule.run(:custom_error, %{}, %{})
+      
+      assert {:error, %{reason: :step_exception, message: error_msg}} = 
+               MultipleExceptionTypesModule.run(:system_error, %{}, %{})
+      assert String.contains?(error_msg, "no such file or directory")
     end
 
     test "pipeline continues to work after exceptions in other actions" do
@@ -277,7 +283,7 @@ defmodule Axn.ErrorHandlingTest do
       assert {:ok, "success"} = PipelineResilienceModule.run(:working_action, %{}, %{})
 
       # Second action should fail gracefully
-      assert {:error, :step_exception} =
+      assert {:error, %{reason: :step_exception, message: "This action fails"}} =
                PipelineResilienceModule.run(:failing_action, %{}, %{})
 
       # Third action should still work (pipeline not corrupted)

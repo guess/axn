@@ -97,7 +97,7 @@ defmodule Axn.TelemetryTest do
     test "emits telemetry span for exception actions" do
       # Exceptions should be converted to error tuples, not raised
       result = TestActions.run(:exception_action, %{}, %{})
-      assert {:error, :step_exception} = result
+      assert {:error, %{reason: :step_exception, message: _}} = result
 
       # For exceptions, we get start then exception event (no stop)
       {:ok, {_start_event, _start_measurements, _start_metadata}} =
