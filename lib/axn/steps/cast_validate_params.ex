@@ -31,8 +31,11 @@ defmodule Axn.Steps.CastValidateParams do
   end
 
   defp cast_and_validate_params(raw_params, schema, validate_fn) do
-    # Create a simple changeset for casting and validation
-    changeset = create_changeset(%{}, raw_params, schema)
+    # Create a dynamic module using the params library
+    dynamic_module = create_dynamic_params_module(schema)
+
+    # Create changeset using the dynamic module
+    changeset = dynamic_module.from(raw_params)
 
     # Apply custom validation function if provided
     final_changeset =
@@ -43,87 +46,28 @@ defmodule Axn.Steps.CastValidateParams do
       end
 
     if final_changeset.valid? do
-      params = Ecto.Changeset.apply_changes(final_changeset)
+      params = Params.to_map(final_changeset)
       {:ok, params, final_changeset}
     else
       {:error, final_changeset}
     end
   end
 
-  defp create_changeset(data, params, schema) do
-    import Ecto.Changeset
+  defp create_dynamic_params_module(schema) do
+    # Create a unique module name to avoid conflicts
+    module_name = :"DynamicParamsModule#{:erlang.unique_integer([:positive])}"
 
-    types = build_types(schema)
-    required_fields = extract_required_fields(schema)
-    optional_fields = extract_optional_fields(schema)
-
-    {data, types}
-    |> cast(params, required_fields ++ optional_fields)
-    |> validate_required(required_fields)
-    |> apply_defaults(schema)
-  end
-
-  defp build_types(schema) do
-    Enum.into(schema, %{}, fn
-      {field_name, type} when is_atom(type) ->
-        field_name = if is_binary(field_name), do: String.to_atom(field_name), else: field_name
-        clean_field = String.replace(to_string(field_name), "!", "")
-        {String.to_atom(clean_field), type}
-
-      {field_name, options} when is_list(options) ->
-        field_name = if is_binary(field_name), do: String.to_atom(field_name), else: field_name
-        clean_field = String.replace(to_string(field_name), "!", "")
-        type = Keyword.get(options, :field)
-        {String.to_atom(clean_field), type}
-    end)
-  end
-
-  defp extract_required_fields(schema) do
-    schema
-    |> Enum.filter(fn
-      {field_name, _type} when is_atom(field_name) ->
-        String.ends_with?(to_string(field_name), "!")
-
-      {field_name, _type} when is_binary(field_name) ->
-        String.ends_with?(field_name, "!")
-    end)
-    |> Enum.map(fn {field_name, _type} ->
-      field_name = if is_binary(field_name), do: String.to_atom(field_name), else: field_name
-      clean_field = String.replace(to_string(field_name), "!", "")
-      String.to_atom(clean_field)
-    end)
-  end
-
-  defp extract_optional_fields(schema) do
-    schema
-    |> Enum.reject(fn
-      {field_name, _type} when is_atom(field_name) ->
-        String.ends_with?(to_string(field_name), "!")
-
-      {field_name, _type} when is_binary(field_name) ->
-        String.ends_with?(field_name, "!")
-    end)
-    |> Enum.map(fn {field_name, _type} ->
-      field_name = if is_binary(field_name), do: String.to_atom(field_name), else: field_name
-      String.to_atom(to_string(field_name))
-    end)
-  end
-
-  defp apply_defaults(changeset, schema) do
-    Enum.reduce(schema, changeset, fn
-      {field_name, [field: _type, default: default_value]}, acc ->
-        field_name = if is_binary(field_name), do: String.to_atom(field_name), else: field_name
-        clean_field = String.replace(to_string(field_name), "!", "")
-        field_atom = String.to_atom(clean_field)
-
-        if Ecto.Changeset.get_field(acc, field_atom) == nil do
-          Ecto.Changeset.put_change(acc, field_atom, default_value)
-        else
-          acc
+    # Generate the module code
+    module_code =
+      quote do
+        defmodule unquote(module_name) do
+          use Params.Schema, unquote(Macro.escape(schema))
         end
+      end
 
-      _other, acc ->
-        acc
-    end)
+    # Compile and load the module
+    Code.eval_quoted(module_code, [], __ENV__)
+
+    module_name
   end
 end
